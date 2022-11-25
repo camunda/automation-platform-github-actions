@@ -1,0 +1,105 @@
+name: Send SUPPORT and SEC notifications
+
+on:
+  workflow_call:
+    inputs:
+      versions:
+        description: 'Release versions (comma-separated list, e.g. 7.17.0,7.16.3,7.15.8)'
+        required: true
+        type: string
+      support-webhook-secret:
+        description: 'Name of the Vault secret that holds the SUPPORT channel slack webhook'
+        required: true
+        type: string
+      sec-webhook-secret:
+        description: 'Name of the Vault secret that holds the SEC channel slack webhook'
+        required: true
+        type: string
+      tech-lead-secret:
+        description: 'Name of the Vault secret that contains the tech lead slack ID'
+        required: true
+        type: string
+
+jobs:
+  extract-issue-links:
+    runs-on: ubuntu-latest
+    name: Extract JIRA issues and notify on slack
+    steps:
+      - name: Import Secrets
+        id: secrets
+        uses: hashicorp/vault-action@v2.4.3
+        with:
+          url: ${{ secrets.VAULT_ADDR }}
+          method: approle
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          secrets: |
+            secret/data/products/cambpm/ci/github-workflow ${{ inputs.support-webhook-secret }} | support-webhook;
+            secret/data/products/cambpm/ci/github-workflow ${{ inputs.sec-webhook-secret }} | sec-webhook;
+            secret/data/products/cambpm/ci/github-workflow ${{ inputs.tech-lead-secret }} | tech-lead-id;
+      - name: Generate release notes links
+        id: generate-release-notes
+        uses: camunda/automation-platform-github-actions/generate-release-notes@main
+        with:
+          versions: ${{ inputs.versions }}
+          version-prefix: "version:"
+      - name: Extract JIRA links from issues
+        id: extract-issue-links
+        uses: camunda/automation-platform-github-actions/extract-issue-links@main
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          versions: ${{ inputs.versions }}
+          version-prefix: "version:"
+      - name: Format SUPPORT JIRA slack blocks
+        id: format-support-jira-links
+        uses: camunda/automation-platform-github-actions/format-jira-links@main
+        with:
+          links: ${{ steps.extract-issue-links.outputs.links-reverse }}
+          issues: ${{ steps.extract-issue-links.outputs.issues }}
+          jira-project: "SUPPORT"
+      - name: Format SEC JIRA slack blocks
+        id: format-sec-jira-links
+        uses: camunda/automation-platform-github-actions/format-jira-links@main
+        with:
+          links: ${{ steps.extract-issue-links.outputs.links-reverse }}
+          issues: ${{ steps.extract-issue-links.outputs.issues }}
+          jira-project: "SEC"
+      - name: Notify about fixed support cases
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              blocks: [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Dear support team, we have released versions ${{ inputs.versions }} of Camunda Platform 7.\nPlease send a release notification to our customers and update the customers in the support cases below. Please note that the release manager may add extra announcements in the thread of this message shortly after the message is published."
+                  }
+                },
+                ${{ steps.generate-release-notes.outputs.release-notes-block }},
+                ${{ steps.format-support-jira-links.outputs.links-blocks }}
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ steps.secrets.outputs.support-webhook }} # from previous step that fetches secrets from Vault  
+      - name: Notify about fixed SEC issues
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              blocks: [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Dear tech lead <@${{ steps.secrets.outputs.tech-lead-id }}>, we have released versions ${{ inputs.versions }}.\nPlease find the involved SEC tickets below and publish security notices as needed."
+                  }
+                },
+                ${{ steps.format-sec-jira-links.outputs.links-blocks }}
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ steps.secrets.outputs.sec-webhook }} # from previous step that fetches secrets from Vault

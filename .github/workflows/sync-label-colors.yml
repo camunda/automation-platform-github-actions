@@ -1,0 +1,17 @@
+name: Synchronize label colors
+
+on:
+  workflow_call:
+      
+jobs:
+  synchronize-label-colors:
+    runs-on: ubuntu-latest
+    name: Synchronize label colors
+    steps:
+      - name: Synchronize label colors
+        id: synchronize-label-colors
+        uses: camunda/automation-platform-github-actions/synchronize-label-colors@main
+        with: 
+          label: ${{ github.event.label.name }}
+          prefix-delimiter: ":"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}

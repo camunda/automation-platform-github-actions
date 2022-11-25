@@ -1,0 +1,28 @@
+name: Copy issue
+
+on:
+  workflow_call:
+    inputs:
+      issue:
+        description: 'Number of the issue to copy'
+        required: true
+        type: string
+      version:
+        description: 'The fix version to assign to the new issues (without label prefix)'
+        required: true
+        type: string
+      
+jobs:
+  copy-issue:
+    runs-on: ubuntu-latest
+    name: Deep copy issue
+    steps:
+      - name: Deep copy issue
+        id: copy-issue
+        uses: camunda/automation-platform-github-actions/copy-issue@main
+        with: 
+          issue: ${{ inputs.issue }}
+          deep-copy: true
+          version: ${{ inputs.version }}
+          version-prefix: "version:"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
