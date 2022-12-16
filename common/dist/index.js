@@ -9777,7 +9777,7 @@ module.exports = async function() {
     
     versions.forEach(function(version) {
     
-      const releaseNotesParams = encodeURIComponent(`is:issue label:${versionPrefix}${version}`);
+      const releaseNotesParams = encodeURIComponent(`is:issue label:"${versionPrefix}${version}"`);
       const searchUrl = `${repoUrl}/issues?q=${releaseNotesParams}`
       releaseNotes.set(searchUrl, `Release notes ${version}`);
     });
