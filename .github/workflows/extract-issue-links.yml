@@ -15,6 +15,14 @@ on:
         description: 'Name of the Vault secret that holds the SEC channel slack webhook'
         required: true
         type: string
+      translation-webhook-secret:
+        description: 'Name of the Vault secret that holds the translation project channel slack webhook'
+        required: true
+        type: string
+      translation-notification-matcher:
+        description: 'Regular expression (POSIX ERE) to match a version for which the translation notification should be sent'
+        required: true
+        type: string
       tech-lead-secret:
         description: 'Name of the Vault secret that contains the tech lead slack ID'
         required: true
@@ -36,6 +44,7 @@ jobs:
           secrets: |
             secret/data/products/cambpm/ci/github-workflow ${{ inputs.support-webhook-secret }} | support-webhook;
             secret/data/products/cambpm/ci/github-workflow ${{ inputs.sec-webhook-secret }} | sec-webhook;
+            secret/data/products/cambpm/ci/github-workflow ${{ inputs.translation-webhook-secret }} | translation-webhook;
             secret/data/products/cambpm/ci/github-workflow ${{ inputs.tech-lead-secret }} | tech-lead-id;
       - name: Generate release notes links
         id: generate-release-notes
@@ -103,3 +112,27 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ steps.secrets.outputs.sec-webhook }} # from previous step that fetches secrets from Vault
+      - name: Determine necessity to send translation notification
+        run: |
+          if [[ "${{ inputs.versions }}" =~ (,|^)[[:space]]*${{ inputs.translation-notification-matcher }}[[:space]]*(,|$) ]]; then   
+            echo "NOTIFY_TRANSLATIONS=true" >> $GITHUB_ENV;
+          fi
+      - name: Notify translation group
+        if: env.NOTIFY_TRANSLATIONS == 'true'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              blocks: [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Dear translation project group, we have released version(s) ${{ inputs.versions }}.\nHappy translating!"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ steps.secrets.outputs.translation-webhook }} # from previous step that fetches secrets from Vault
