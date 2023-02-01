@@ -114,8 +114,11 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ steps.secrets.outputs.sec-webhook }} # from previous step that fetches secrets from Vault
       - name: Determine necessity to send translation notification
         run: |
-          if [[ "${{ inputs.versions }}" =~ (,|^)[[:space]]*${{ inputs.translation-notification-matcher }}[[:space]]*(,|$) ]]; then   
+          if [[ "${{ inputs.versions }}" =~ (,|^)[[:space:]]*${{ inputs.translation-notification-matcher }}[[:space:]]*(,|$) ]]; then
             echo "NOTIFY_TRANSLATIONS=true" >> $GITHUB_ENV;
+            echo "Version regex matched. Conditional flag is set."
+          else
+            echo "Version regex not matched. Conditional flag is not set."
           fi
       - name: Notify translation group
         if: env.NOTIFY_TRANSLATIONS == 'true'
