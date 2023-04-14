@@ -1,0 +1,60 @@
+name: ChatOps Command Parser
+
+on:
+  workflow_call:
+    inputs:
+      vault_path:
+        description: 'Path in the Vault holding GitHub app secrets'
+        required: false
+        type: string
+        default: "secret/data/products/cambpm/ci/github-workflow"
+
+jobs:
+  chatOpsCommandParser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate a GitHub token
+        id: generate-github-token
+        uses: camunda/infra-global-github-actions/generate-github-app-token-from-vault-secrets@main
+        with:
+          github-app-id-vault-key: GITHUB_APP_ID
+          github-app-id-vault-path: ${{ inputs.vault_path }}
+          github-app-private-key-vault-key: GITHUB_APP_PRIVATE_KEY
+          github-app-private-key-vault-path: ${{ inputs.vault_path }}
+          vault-auth-method: approle
+          vault-auth-role-id: ${{ secrets.VAULT_ROLE_ID }}
+          vault-auth-secret-id: ${{ secrets.VAULT_SECRET_ID}}
+          vault-url: ${{ secrets.VAULT_ADDR }}
+
+      - name: Slash Command Dispatch
+        uses: peter-evans/slash-command-dispatch@v3
+        with:
+          token: ${{ steps.generate-github-token.outputs.token }}
+          config: >
+            [
+              {
+                "command": "help",
+                "permission": "none",
+                "issue_type": "both"
+              },
+              {
+                "command": "ci",
+                "permission": "none",
+                "issue_type": "pull-request"
+              },
+              {
+                "command": "assign",
+                "permission": "none",
+                "issue_type": "issue"
+              },
+              {
+                "command": "start",
+                "permission": "none",
+                "issue_type": "issue"
+              },
+              {
+                "command": "review",
+                "permission": "none",
+                "issue_type": "issue"
+              }
+            ]

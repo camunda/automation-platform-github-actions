@@ -1,0 +1,12 @@
+name: "Test: Publish test results"
+
+on:
+  workflow_run:
+    workflows: ["Test: ChatOps CI command"]
+    types:
+      - completed
+
+jobs:
+  call-reusable-flow:
+    uses: camunda/automation-platform-github-actions/.github/workflows/publish-test-results.yml@18-chatops
+    secrets: inherit

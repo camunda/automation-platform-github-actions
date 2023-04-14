@@ -1,0 +1,21 @@
+name: "Test: ChatOps CI command"
+
+on:
+  repository_dispatch:
+    types: [ci-command]
+
+jobs:
+  chatOpsStartCommandParser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump the client payload context
+        env:
+          PAYLOAD_CONTEXT: ${{ toJson(github.event.client_payload) }}
+        run: echo "$PAYLOAD_CONTEXT"
+
+  call-reusable-flow:
+    uses: camunda/automation-platform-github-actions/.github/workflows/chatops-ci.yml@18-chatops
+    secrets: inherit
+    with:
+      maven_parameters: clean verify
+      with_npm: false

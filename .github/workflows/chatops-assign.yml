@@ -1,0 +1,114 @@
+name: ChatOps Assign Command
+
+on:
+  workflow_call:
+    inputs:
+      project_id:
+        description: 'ID of the project in the organization'
+        required: false
+        type: string
+        default: "40"
+      organization:
+        description: 'Name of the GitHub organization'
+        required: false
+        type: string
+        default: "camunda"
+      status:
+        description: 'Value of the status to set'
+        required: false
+        type: string
+        default: "🗂 Ready"
+
+jobs:
+  chatOpsCommandParser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create vars
+        id: vars
+        run: |
+          echo "run_url=https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Dump the client payload context
+        env:
+          PAYLOAD_CONTEXT: ${{ toJson(github.event.client_payload) }}
+        run: echo "$PAYLOAD_CONTEXT"
+
+      - name: Generate a GitHub token
+        id: generate-github-token
+        uses: camunda/infra-global-github-actions/generate-github-app-token-from-vault-secrets@main
+        with:
+          github-app-id-vault-key: GITHUB_APP_ID
+          github-app-id-vault-path: secret/data/products/cambpm/ci/github-workflow
+          github-app-private-key-vault-key: GITHUB_APP_PRIVATE_KEY
+          github-app-private-key-vault-path: secret/data/products/cambpm/ci/github-workflow
+          vault-auth-method: approle
+          vault-auth-role-id: ${{ secrets.VAULT_ROLE_ID }}
+          vault-auth-secret-id: ${{ secrets.VAULT_SECRET_ID}}
+          vault-url: ${{ secrets.VAULT_ADDR }}
+
+      - name: Set assignee username
+        id: parse-args
+        run: |
+          ASSIGNEE=${{ github.event.client_payload.slash_command.args.unnamed.arg1 }}
+          ASSIGNEE="${ASSIGNEE//@/}"
+
+          echo "assignee=${ASSIGNEE}" >> "$GITHUB_OUTPUT"
+
+      - name: Update Status field
+        uses: github/update-project-action@main
+        id: update-status
+        with:
+          github_token: ${{ steps.generate-github-token.outputs.token }}
+          organization: ${{ inputs.organization }}
+          project_number: ${{ inputs.project_id }}
+          content_id: ${{ github.event.client_payload.github.payload.issue.node_id }}
+          field: Status
+          value: ${{ inputs.status }}
+
+      - name: Update DRI field
+        uses: github/update-project-action@main
+        id: update-dri
+        with:
+          github_token: ${{ steps.generate-github-token.outputs.token }}
+          organization: ${{ inputs.organization }}
+          project_number: ${{ inputs.project_id }}
+          content_id: ${{ github.event.client_payload.github.payload.issue.node_id }}
+          field: DRI
+          value: "@${{ steps.parse-args.outputs.assignee }}"
+
+      - name: Replace assignee
+        id: replace-assignee
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh version
+          gh issue edit ${{ github.event.client_payload.github.payload.issue.html_url }} --remove-assignee ""
+          sleep 2  # avoiding race condition between two commands
+          gh issue edit ${{ github.event.client_payload.github.payload.issue.html_url }} --add-assignee ${{ steps.parse-args.outputs.assignee }}
+
+      - name: Update comment
+        uses: peter-evans/create-or-update-comment@v2
+        with:
+          comment-id: ${{ github.event.client_payload.github.payload.comment.id }}
+          body: |
+            > <details>
+            > <summary>:robot: Reply from the bot</summary>
+            >
+            > Changing this issue:
+            >
+            > Field | New Value
+            > --- | ---
+            > `Status` | `${{ inputs.status }}`
+            > `Assignee` | @${{ steps.parse-args.outputs.assignee }}
+            > `DRI` | @${{ steps.parse-args.outputs.assignee }}
+            > </details>
+          reaction-type: hooray
+
+      - name: Update comment in case of failure
+        if: failure()
+        uses: peter-evans/create-or-update-comment@v2
+        with:
+          comment-id: ${{ github.event.client_payload.github.payload.comment.id }}
+          body: |
+            > Had issues fulfilling your command, check the [logs](${{ steps.vars.outputs.run_url }})
+          reaction-type: confused

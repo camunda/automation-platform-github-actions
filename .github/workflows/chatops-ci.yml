@@ -1,0 +1,98 @@
+name: ChatOps CI command
+
+on:
+  workflow_call:
+    inputs:
+      with_npm:
+        description: "Flag to determine whether Node.js needs to be setup"
+        required: false
+        type: boolean
+        default: true
+      maven_parameters:
+        description: "The Maven parameters, including goals and profiles"
+        required: false
+        type: string
+        default: clean source:jar verify source:test-jar com.mycila:license-maven-plugin:check -Pdistro,distro-ce,distro-wildfly,distro-webjar,h2-in-memory
+
+jobs:
+  event_file:
+    name: Event File
+    runs-on: ubuntu-latest
+    steps:
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: Event File
+          path: ${{ github.event_path }}
+
+  sha_ref_file:
+    name: SHA File
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create SHA ref file
+        run: echo '${{ github.event.client_payload.pull_request.head.sha }}' > sha_ref 
+      
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: SHAFile
+          path: sha_ref
+
+  ASSEMBLY:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Import Secrets
+        id: secrets
+        uses: hashicorp/vault-action@v2.5.0
+        with:
+          url: ${{ secrets.VAULT_ADDR }}
+          method: approle
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          exportEnv: false
+          secrets: |
+            secret/data/products/connectors/ci/common ARTIFACTORY_USR;
+            secret/data/products/connectors/ci/common ARTIFACTORY_PSW;
+      
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.client_payload.pull_request.merge_commit_sha }}
+      
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: 11
+          cache: maven
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        if: ${{ inputs.with_npm }}
+        with:
+          node-version: 14.6.0
+          cache: npm
+
+      - name: Create settings.xml
+        uses: s4u/maven-settings-action@v2.8.0
+        with:
+          githubServer: false
+          servers: |
+            [{
+               "id": "camunda-nexus",
+               "username": "${{ steps.secrets.outputs.ARTIFACTORY_USR }}",
+               "password": "${{ steps.secrets.outputs.ARTIFACTORY_PSW }}"
+             }]
+          mirrors: '[{"url": "https://artifacts.camunda.com/artifactory/internal/", "id": "camunda-nexus", "mirrorOf": "camunda-nexus", "name": "camunda Nexus"}]'
+      
+      - name: Run tests
+        run: mvn ${{ inputs.maven_parameters }}
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: Test Results
+          path: |
+            **/target/surefire-reports/*.xml
+            **/target/failsafe-reports/TEST-*.xml

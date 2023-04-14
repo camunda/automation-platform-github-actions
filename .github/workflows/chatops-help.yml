@@ -1,0 +1,65 @@
+name: ChatOps Assign Command
+
+on:
+  workflow_call:
+
+jobs:
+  chatOpsCommandParser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create vars
+        id: vars
+        run: |
+          echo "run_url=https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Dump the client payload context
+        env:
+          PAYLOAD_CONTEXT: ${{ toJson(github.event.client_payload) }}
+        run: echo "$PAYLOAD_CONTEXT"
+
+      - name: Update issue comment
+        uses: peter-evans/create-or-update-comment@v2
+        if: github.event.client_payload.pull_request == null
+        with:
+          comment-id: ${{ github.event.client_payload.github.payload.comment.id }}
+          body: |
+            > <details>
+            > <summary>:robot: Reply from the bot</summary>
+            >
+            > Here's a list of commands supported:
+            >
+            > Command | Description
+            > --- | ---
+            > `/help` | Post this message
+            > `/assign username` | Can be run by anyone when they want to assign an issue to `username`.<br/><br/> • `Status` ➝ `Ready`<br/> • `Assignee` ➝ `@username`<br/> • `DRI` ➝ `@username`
+            > `/start` | To be run by an Automation Platform team member (`DRI`) when they start working on an issue.<br/><br/> • `Status` ➝ `In Progress`<br/> • `Assignee` ➝ comment author<br/> • `DRI` ➝ comment author
+            > `/review username` | To be run by `DRI` when they want to pass the issue to review.<br/><br/> • `Status` ➝ `In Review`<br/> • `Assignee` ➝ `@username` <br/> • `Code Reviewer` ➝ `@username`
+            > </details>
+          reaction-type: hooray
+
+      - name: Update PR comment
+        uses: peter-evans/create-or-update-comment@v2
+        if: github.event.client_payload.pull_request != null
+        with:
+          comment-id: ${{ github.event.client_payload.github.payload.comment.id }}
+          body: |
+            > <details>
+            > <summary>:robot: Reply from the bot</summary>
+            >
+            > Here's a list of commands supported:
+            >
+            > Command | Description
+            > --- | ---
+            > `/help` | Post this message
+            > `/ci` | Can be run by anyone when they want to run the basic CI for this PR
+            > </details>
+          reaction-type: hooray
+
+      - name: Update comment in case of failure
+        if: failure()
+        uses: peter-evans/create-or-update-comment@v2
+        with:
+          comment-id: ${{ github.event.client_payload.github.payload.comment.id }}
+          body: |
+            > Had issues fulfilling your command, check the [logs](${{ steps.vars.outputs.run_url }})
+          reaction-type: confused

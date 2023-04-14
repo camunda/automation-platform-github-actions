@@ -1,0 +1,44 @@
+name: Publish test results
+
+on:
+  workflow_call:
+
+jobs:
+  test-results:
+    name: Test Results
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion != 'skipped'
+
+    steps:
+      - name: Dump the context
+        env:
+          PAYLOAD_CONTEXT: ${{ toJson(github.event) }}
+        run: echo "$PAYLOAD_CONTEXT"
+
+      - name: Download and Extract Artifacts
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        run: |
+           mkdir -p artifacts && cd artifacts
+
+           artifacts_url=${{ github.event.workflow_run.artifacts_url }}
+
+           gh api --paginate "$artifacts_url" -q '.artifacts[] | [.name, .archive_download_url] | @tsv' | while read artifact
+           do
+             IFS=$'\t' read name url <<< "$artifact"
+             gh api $url > "$name.zip"
+             unzip -d "$name" "$name.zip"
+           done
+
+      - name: Read SHA ref file
+        id: getsha
+        run: echo "sha=$(cat artifacts/SHAFile/sha_ref)" >> $GITHUB_OUTPUT
+
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          commit: ${{ steps.getsha.outputs.sha }}
+          event_file: artifacts/Event File/event.json
+          event_name: ${{ github.event.workflow_run.event }}
+          files: "artifacts/**/*.xml"
+          comment_mode: off

@@ -1,0 +1,11 @@
+name: "Test: ChatOps Command Parser"
+
+on:
+  issue_comment:
+    types: 
+      - created
+
+jobs:
+  call-reusable-flow:
+    uses: camunda/automation-platform-github-actions/.github/workflows/chatops-command-dispatch.yml@18-chatops
+    secrets: inherit
