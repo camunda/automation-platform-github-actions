@@ -23,8 +23,16 @@ on:
         description: 'Regular expression (POSIX ERE) to match a version for which the translation notification should be sent'
         required: true
         type: string
-      tech-lead-secret:
-        description: 'Name of the Vault secret that contains the tech lead slack ID'
+      devex-webhook-secret:
+        description: 'Name of the Vault secret that holds the devex project channel slack webhook'
+        required: true
+        type: string
+      devex-notification-matcher:
+        description: 'Regular expression (POSIX ERE) to match a version for which the devex notification should be sent'
+        required: true
+        type: string
+      sec-dri-secret:
+        description: 'Name of the Vault secret that contains the slack ID of the DRI for security notices'
         required: true
         type: string
 
@@ -45,7 +53,8 @@ jobs:
             secret/data/products/cambpm/ci/github-workflow ${{ inputs.support-webhook-secret }} | support-webhook;
             secret/data/products/cambpm/ci/github-workflow ${{ inputs.sec-webhook-secret }} | sec-webhook;
             secret/data/products/cambpm/ci/github-workflow ${{ inputs.translation-webhook-secret }} | translation-webhook;
-            secret/data/products/cambpm/ci/github-workflow ${{ inputs.tech-lead-secret }} | tech-lead-id;
+            secret/data/products/cambpm/ci/github-workflow ${{ inputs.devex-webhook-secret }} | devex-webhook;
+            secret/data/products/cambpm/ci/github-workflow ${{ inputs.sec-dri-secret }} | sec-dri-id;
       - name: Generate release notes links
         id: generate-release-notes
         uses: camunda/automation-platform-github-actions/generate-release-notes@main
@@ -104,7 +113,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Dear tech lead <@${{ steps.secrets.outputs.tech-lead-id }}>, we have released versions ${{ inputs.versions }}.\nPlease find the involved SEC tickets below and publish security notices as needed."
+                    "text": "Dear <@${{ steps.secrets.outputs.sec-dri-id }}>, we have released versions ${{ inputs.versions }}.\nPlease find the involved SEC tickets below and publish security notices as needed."
                   }
                 },
                 ${{ steps.format-sec-jira-links.outputs.links-blocks }}
@@ -112,13 +121,19 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ steps.secrets.outputs.sec-webhook }} # from previous step that fetches secrets from Vault
-      - name: Determine necessity to send translation notification
+      - name: Determine necessity to send optional notifications
         run: |
           if [[ "${{ inputs.versions }}" =~ (,|^)[[:space:]]*${{ inputs.translation-notification-matcher }}[[:space:]]*(,|$) ]]; then
             echo "NOTIFY_TRANSLATIONS=true" >> $GITHUB_ENV;
-            echo "Version regex matched. Conditional flag is set."
+            echo "Translation version regex matched. Conditional flag is set."
           else
-            echo "Version regex not matched. Conditional flag is not set."
+            echo "Translation version regex not matched. Conditional flag is not set."
+          fi
+          if [[ "${{ inputs.versions }}" =~ (,|^)[[:space:]]*${{ inputs.devex-notification-matcher }}[[:space:]]*(,|$) ]]; then
+            echo "NOTIFY_DEVEX=true" >> $GITHUB_ENV;
+            echo "Devex version regex matched. Conditional flag is set."
+          else
+            echo "Devex version regex not matched. Conditional flag is not set."
           fi
       - name: Notify translation group
         if: env.NOTIFY_TRANSLATIONS == 'true'
@@ -138,4 +153,23 @@ jobs:
               ]
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ steps.secrets.outputs.translation-webhook }} # from previous step that fetches secrets from Vault
+          SLACK_WEBHOOK_URL: ${{ steps.secrets.outputs.translation-webhook }}
+      - name: Notify Devex
+        if: env.NOTIFY_DEVEX == 'true'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              blocks: [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Dear developer experience team, we have released version(s) ${{ inputs.versions }}.\nWe should submit the latest docs.camunda.org sitemap to Google, to preserve search-ability of the C7 docs. Could someone from your team please do that for us?"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ steps.secrets.outputs.devex-webhook }}
