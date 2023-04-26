@@ -18,4 +18,6 @@ jobs:
       sec-webhook-secret: TEST_CHANNEL_SLACK_WEBHOOK_URL
       translation-webhook-secret: TEST_CHANNEL_SLACK_WEBHOOK_URL
       translation-notification-matcher: 1\.[0-9]+\.3
-      tech-lead-secret: TECH_LEAD_SLACK_ID
+      devex-webhook-secret: TEST_CHANNEL_SLACK_WEBHOOK_URL
+      devex-notification-matcher: 2\.[0-9]+\.4
+      sec-dri-secret: SEC_DRI_SLACK_ID
