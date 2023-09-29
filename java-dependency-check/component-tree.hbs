@@ -1,0 +1,7 @@
+{{#indent nestingLevel lastItemInList}}{{/indent}}{{emojifyChangeType changeType}} {{ name }}:{{>componentVersion}}  
+{{#if (shouldRenderComponentTree this)}}
+{{#each dependencies}}
+{{>componentTree nestingLevel=(increment ../nestingLevel) lastItemInList=@last changeType=../changeType}}
+{{/each}}
+{{else if (hasDependencies this)}}{{#indent (increment nestingLevel)}}{{/indent}}(Repeating subtree omitted)  
+{{/if}}

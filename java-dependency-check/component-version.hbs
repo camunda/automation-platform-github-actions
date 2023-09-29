@@ -1,0 +1,5 @@
+{{#if thirdParty~}}
+<a href="#{{ renderId }}-{{ urlEncode name }}{{ urlEncode ':' }}{{ urlEncode version }}">{{ version }}</a> {{#if allLicensesGo}}{{emojifyLicense 'Go'}}{{/if}}{{#each carefulLicenseTypes}}{{#if used}}{{emojifyLicense type}}{{/if}}{{/each}}{{#if hasMultipleLicenses}}&#8252;{{/if}}
+{{~else~}}
+{{version}}
+{{~/if}}

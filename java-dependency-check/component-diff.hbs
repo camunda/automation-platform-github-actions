@@ -1,0 +1,14 @@
+{{!-- careful: preserve the double space characters at the end of the content lines to make sure that new lines are generated--}}
+{{#indent nestingLevel lastItemInList}}{{/indent}}{{emojifyChangeType changeType}} {{#baseComponent}}{{ name }}: {{>componentVersion}}{{/baseComponent}} => {{#comparingComponent}}{{>componentVersion}}{{/comparingComponent}}  
+{{#if (shouldRenderComponentDiff this)}}
+{{#each changedDependencies}}
+{{>componentDiff nestingLevel=(increment ../nestingLevel) lastItemInList=@last}}
+{{/each}}
+{{#each addedDependencies}}
+{{>componentTree nestingLevel=(increment ../nestingLevel) lastItemInList=@last changeType='Added'}}  
+{{/each}}
+{{#each removedDependencies}}
+{{>componentTree nestingLevel=(increment ../nestingLevel) lastItemInList=@last changeType='Removed'}}  
+{{/each}}
+{{else if (hasChanges this)}}{{#indent (increment nestingLevel)}}{{/indent}}(Repeating subtree omitted)  
+{{/if}}
