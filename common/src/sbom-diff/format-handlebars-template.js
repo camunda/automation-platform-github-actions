@@ -62,7 +62,7 @@ module.exports = async function (sbomDiff, template, partials = {}) {
     currentIndentationState[times - 1] = lastItemInList;
 
     const visualizationComponents = currentIndentationState.map((lastItemInListAtCurrentLevel, index) => {
-      const isMostDeeplyNestedList = index == currentIndentationState.length - 1;
+      const isMostDeeplyNestedList = index === currentIndentationState.length - 1;
       
       if (lastItemInListAtCurrentLevel) {
         return isMostDeeplyNestedList ? ' └─ ' : '    ';
@@ -87,9 +87,9 @@ module.exports = async function (sbomDiff, template, partials = {}) {
   });
 
   handlebars.registerHelper('hasChanges', function(componentDiff) {
-    return Object.keys(componentDiff.changedDependencies).length != 0 ||
-    Object.keys(componentDiff.addedDependencies).length != 0 ||
-    Object.keys(componentDiff.removedDependencies).length != 0;
+    return Object.keys(componentDiff.changedDependencies).length !== 0 ||
+    Object.keys(componentDiff.addedDependencies).length !== 0 ||
+    Object.keys(componentDiff.removedDependencies).length !== 0;
   });
 
   const renderedDiffs = new Set();
@@ -105,7 +105,7 @@ module.exports = async function (sbomDiff, template, partials = {}) {
   });
 
   handlebars.registerHelper('hasDependencies', function(component) {
-    return Object.keys(component.dependencies).length != 0;
+    return Object.keys(component.dependencies).length !== 0;
   });
 
   const renderedTrees = new Set();

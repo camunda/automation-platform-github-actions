@@ -67,7 +67,7 @@ class SBOMParser {
       */
             
       // make a copy because we are modifying this array as we iterate
-      var dependents = component.dependents.slice();
+      let dependents = component.dependents.slice();
       
       while (dependents.length > 0) {
         const currentDependent = dependents.pop();

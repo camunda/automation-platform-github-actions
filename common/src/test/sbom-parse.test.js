@@ -26,7 +26,7 @@ describe("SBOM diff", () => {
     
     expect(components.size).toEqual(19);
 
-    var numThirdPartyComponents = 0;
+    let numThirdPartyComponents = 0;
 
     components.forEach(component => {
       if (component.thirdParty) {
