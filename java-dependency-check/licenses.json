@@ -1,0 +1,37 @@
+{
+    "go": [
+        "BSD-3-Clause",
+        "ISC",
+        "Apache-2.0",
+        "MIT",
+        "MIT-0",
+        "SAX-PD",
+        "WTFPL",
+        "BSD-2-Clause",
+        "Ruby",
+        "OFL-1.1",
+        "0BSD",
+        "Unlicense",
+        "UPL-1.0",
+        "CC-BY-SA-3.0",
+        "CC-BY-4.0",
+        "Plexus"
+    ],
+    "caution": [
+        "CDDL-1.0",
+        "CDDL-1.1",
+        "CPL-1.0",
+        "MPL-1.0",
+        "MPL-1.1",
+        "LGPL-2.1",
+        "LGPL-3.0",
+        "EPL-1.0",
+        "EPL-2.0",
+        "W3C-20150513"
+    ],
+    "stop": [
+        "GPL-2.0",
+        "GPL-3.0",
+        "TMate"
+    ]
+}
