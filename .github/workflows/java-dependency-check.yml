@@ -1,0 +1,79 @@
+name: Compare the dependencies of a pull request to a Maven multi-module project with the base branch. Check according to our Stop & Go list.
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: 'The reference of the github commit of the reusable workflow. Must match the specified branch/tag/commit where the workflow is called. Workaround to https://github.com/actions/runner/issues/2417. Should never be untrusted content.'
+        default: 'main'
+        type: string
+    secrets:
+      VAULT_ADDR:
+        required: true
+      VAULT_ROLE_ID:
+        required: true
+      VAULT_SECRET_ID:
+        required: true
+
+jobs:
+  java-dependency-check:
+    runs-on: ubuntu-latest
+    name: Java Dependency Check
+    # todo: filter by label if diff should be performed
+    steps:
+      - name: Import Secrets
+        id: secrets
+        uses: hashicorp/vault-action@v2.4.3
+        with:
+          url: ${{ secrets.VAULT_ADDR }}
+          method: approle
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          secrets: |
+            secret/data/github.com/organizations/camunda NEXUS_USR;
+            secret/data/github.com/organizations/camunda NEXUS_PSW;
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          path: repo-to-check
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Checkout reusable workflow dir
+        uses: actions/checkout@v3
+        with:
+          repository: camunda/automation-platform-github-actions
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: automation-platform-github-actions
+          ref: ${{ inputs.ref }} # github.job_workflow_sha seems to be the documented parameter to resolve this, but doesn't work in practice
+      - name: Generate SBOMs
+        id: generate-sboms
+        run: bash ${{ github.workspace }}/automation-platform-github-actions/java-dependency-check/generate-sboms.sh ${{ github.workspace }}/automation-platform-github-actions/java-dependency-check/maven-settings.xml
+        working-directory: ${{ github.workspace }}/repo-to-check
+      - name: Diff SBOMs
+        id: diff-sboms
+        uses: ./automation-platform-github-actions/java-dependency-check
+        with: 
+          base-sbom: ${{ github.workspace }}/repo-to-check/target/diff/base.json
+          head-sbom: ${{ github.workspace }}/repo-to-check/target/diff/head.json
+          primary-party-group-matcher: "^org\\.camunda"
+          license-list: ${{ github.workspace }}/automation-platform-github-actions/java-dependency-check/licenses.json
+          github-comment-template: ${{ github.workspace }}/automation-platform-github-actions/java-dependency-check/diff.hbs
+          partials: |
+            componentDetails:${{ github.workspace }}/automation-platform-github-actions/java-dependency-check/component-details.hbs
+            componentDiff:${{ github.workspace }}/automation-platform-github-actions/java-dependency-check/component-diff.hbs
+            componentTree:${{ github.workspace }}/automation-platform-github-actions/java-dependency-check/component-tree.hbs
+            componentVersion:${{ github.workspace }}/automation-platform-github-actions/java-dependency-check/component-version.hbs
+          output-path: ${{ github.workspace }}/dependency-diff.html
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload full diff as workflow artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: artifacts.zip
+          path: |
+            ${{ github.workspace }}/dependency-diff.html
+            ${{ github.workspace }}/repo-to-check/target/diff/base.json
+            ${{ github.workspace }}/repo-to-check/target/diff/head.json
+          retention-days: 30

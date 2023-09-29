@@ -1,0 +1,30 @@
+name: 'Diff SBOMs'
+description: 'Diffs two SBOM files and publishes a comment in a github pull request with the result'
+inputs:
+  base-sbom:
+    description: 'The path to the base SBOM file'
+    required: true
+  head-sbom:
+    description: 'The path to the SBOM file to compare to the base SBOM'
+    required: true
+  primary-party-group-matcher:
+    description: 'A Javascript regex that is matched against artifact group IDs to determine primary dependencies (i.e. not third-party)'
+    required: true
+  license-list:
+    description: 'The path to a file that contains the go/caution/stop license lists'
+    required: true
+  github-comment-template:
+    description: 'The path to a handlebars template for the resulting github comment'
+    required: true
+  partials:
+    description: 'A multi-line string, each line of the format <name>:<path> pointing to a handlebars partial file used by the main template'
+    required: false
+  repo-token:
+    description: 'Github access token'
+    required: true
+  output-path:
+    description: 'Path to a file that the full diff output will be written to (in HTML)'
+    required: true  
+runs:
+  using: 'node16'
+  main: 'index.js'
