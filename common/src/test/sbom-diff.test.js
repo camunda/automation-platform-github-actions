@@ -13,10 +13,14 @@ describe("SBOM diff", () => {
 
   test("it should detect an added dependency", async () => {
     
+    // given
     const projectA1SBOM = readJson(path.join(__dirname, 'sbom-diff-test-resources', 'project-a1.json'));
     const projectA3SBOM = readJson(path.join(__dirname, 'sbom-diff-test-resources', 'project-a3.json'));
     
+    // when
     const diff = await diffSBOMs(projectA3SBOM, projectA1SBOM, '^org\\.camunda');
+    
+    // then
     const rootComponentDiff = diff.rootComponentDiff;
     
     expect(rootComponentDiff).toDescribeComponent('org.camunda.example', 'project-a', '1.0-SNAPSHOT');
@@ -28,10 +32,14 @@ describe("SBOM diff", () => {
 
   test("it should detect a removed dependency", async () => {
     
+    // given
     const projectA1SBOM = readJson(path.join(__dirname, 'sbom-diff-test-resources', 'project-a1.json'));
     const projectA3SBOM = readJson(path.join(__dirname, 'sbom-diff-test-resources', 'project-a3.json'));
     
+    // when
     const diff = await diffSBOMs(projectA1SBOM, projectA3SBOM, '^org\\.camunda');
+    
+    // then
     const rootComponentDiff = diff.rootComponentDiff;
 
     expect(rootComponentDiff).toDescribeComponent('org.camunda.example', 'project-a', '1.0-SNAPSHOT');
@@ -43,10 +51,14 @@ describe("SBOM diff", () => {
 
   test("it should diff a complex changed dependency", async () => {
     
+    // given
     const projectA1SBOM = readJson(path.join(__dirname, 'sbom-diff-test-resources', 'project-a1.json'));
     const projectA2SBOM = readJson(path.join(__dirname, 'sbom-diff-test-resources', 'project-a2.json'));
     
+    // when
     const diff = await diffSBOMs(projectA1SBOM, projectA2SBOM, '^org\\.camunda');
+    
+    // then
     const rootComponentDiff = diff.rootComponentDiff;
 
     expect(rootComponentDiff).toDescribeComponent('org.camunda.example', 'project-a', '1.0-SNAPSHOT');

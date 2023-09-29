@@ -6,8 +6,8 @@ function toDescribeComponent(actual, group, name, version) {
       throw new Error(`Must be used with an instance of SBOMDiff. Got ${actual}`);
     }
   
-    var baseComponent = actual.baseComponent;
-    var comparingComponent = actual.comparingComponent;
+    const baseComponent = actual.baseComponent;
+    const comparingComponent = actual.comparingComponent;
   
     const isMatch = component => component.group === group 
       && component.name === name 
@@ -52,7 +52,7 @@ function toDescribeComponent(actual, group, name, version) {
   
     const actualChanges = Object.assign({}, actual.changedDependencies);
     const unmatchedChanges = [];
-    var allChangesMatch = true;
+    let allChangesMatch = true;
   
     changes.forEach(change => {
       const actualChange = actualChanges[change.moduleId];

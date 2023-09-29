@@ -47,7 +47,7 @@ class Component {
       result.carefulLicenseTypes = [{type: LicenseType.Unknown, used: true}]
     }
 
-    result.allLicensesGo = result.licenses.length > 0 && result.licenses.every(license => license.type == LicenseType.Go);
+    result.allLicensesGo = result.licenses.length > 0 && result.licenses.every(license => license.type === LicenseType.Go);
 
     result.hasMultipleLicenses = result.licenses.length > 1;
 
@@ -190,9 +190,9 @@ class SBOMComponentDiff {
   }
 
   hasChanges() {
-    return Object.keys(this.changedDependencies).length != 0 ||
-      Object.keys(this.addedDependencies).length != 0 ||
-      Object.keys(this.removedDependencies).length != 0;
+    return Object.keys(this.changedDependencies).length !== 0 ||
+      Object.keys(this.addedDependencies).length !== 0 ||
+      Object.keys(this.removedDependencies).length !== 0;
   }
 
   addChangedDependency(component, componentDiff) {

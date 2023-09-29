@@ -37,7 +37,7 @@ function diffComponents(sbomDiff, baseComponent, comparingComponent) {
       dependency the traversal belongs
   */
 
-  var componentDiff = sbomDiff.getComponentDiff(baseComponent, comparingComponent);
+  let componentDiff = sbomDiff.getComponentDiff(baseComponent, comparingComponent);
   if (componentDiff) {
     /*
     * In an SBOM, any unique component has only one set of dependencies. 

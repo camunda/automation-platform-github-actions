@@ -49,7 +49,7 @@ module.exports = async function () {
     core.info(`Dependency diff:`);
     core.info(diff.fullDiff);
 
-    octokit.rest.issues.createComment({
+    await octokit.rest.issues.createComment({
         owner: repo.owner.login,
         repo: repo.name,
         issue_number: prNumber,
