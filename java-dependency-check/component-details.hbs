@@ -1,0 +1,13 @@
+<details>
+  <summary><a id="{{ renderId }}-{{ name }}:{{ version }}">{{ name }}:{{ version }}</a></summary>
+  
+  Declared licenses:{{#unless licenses.length}} None{{/unless}}
+  {{#each licenses}}
+  * {{string}} {{emojifyLicense type}}
+  {{/each}}
+
+  Links:{{#unless links.length}} None{{/unless}}
+  {{#each links}}
+  * [{{ label }}]({{ link }})
+  {{/each}}
+</details>

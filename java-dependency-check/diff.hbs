@@ -1,0 +1,66 @@
+# Java dependency diff
+
+{{#unless excludeTree}}
+<pre>
+{{#diff.rootComponentDiff}}
+{{>componentDiff nestingLevel=0}}
+{{/diff.rootComponentDiff}}
+</pre>
+{{else}}
+Omitted due to character limit. See workflow artifacts for full diff file.
+{{/unless}}
+
+# Module details
+
+{{#unless excludeModuleDetails}}
+{{#each diff.involvedComponents}}
+{{#if thirdParty}}
+{{>componentDetails}}
+{{/if}}
+{{/each}}
+{{else}}
+Omitted due to character limit. See workflow artifacts for full diff file.
+{{/unless}}
+
+# Checklist
+
+## Unique changes
+
+{{#each diff.changedDependencies}}
+{{#if baseComponent.thirdParty}}
+- [ ] {{#baseComponent}}{{name}}: {{>componentVersion}}{{/baseComponent}} => {{#comparingComponent}}{{>componentVersion}}{{/comparingComponent}}{{#if (isDowngrade changeType)}} {{emojifyChangeType changeType}}{{/if}}
+{{/if}}
+{{/each}}
+
+## Unique additions
+
+{{#each diff.addedDependencies}}
+{{#if thirdParty}}
+- [ ] {{name}}:{{>componentVersion}}
+{{/if}}
+{{/each}}
+
+# Developer comments
+
+<!-- Put any explanations of your assessment here -->
+
+# Glossary
+
+## Limitations 
+
+* The reported transitive dependencies may not always be accurate in a multi-module project.
+The SBOM file format represents a unique dependency (coordinates + type) only once. In a multi-module
+project a dependency can be declared in multiple locations with different exclusions of transitive dependencies
+or different version overrides for transitive dependencies.
+
+## Emojies
+
+* {{emojifyLicense 'Go'}}: All licenses are on the Go list
+* {{emojifyLicense 'Caution'}}: (At least one) license is on the Caution list
+* {{emojifyLicense 'Stop'}}: (At least one) license is on the Stop list
+* {{emojifyLicense 'Unknown'}}: (At least one) license cannot be determined or is unknown
+* &#8252;: Dependency has multiple licenses declared
+* {{emojifyChangeType 'Upgraded'}}: New dependency version is higher than previous
+* {{emojifyChangeType 'Downgraded'}}: New dependency version is lower than previous
+* {{emojifyChangeType 'DependenciesChanged'}}: Dependency version is equal and the dependencies of this component changed (e.g. when comparing snapshots)
+* {{emojifyChangeType 'Unknown'}}: The change of the dependency version can not be determined further (e.g. because the version does not follow semantic versioning)
