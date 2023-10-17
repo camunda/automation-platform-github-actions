@@ -15,7 +15,9 @@
         "UPL-1.0",
         "CC-BY-SA-3.0",
         "CC-BY-4.0",
-        "Plexus"
+        "Plexus",
+        "GPL/CP",
+        "Go"
     ],
     "caution": [
         "CDDL-1.0",
