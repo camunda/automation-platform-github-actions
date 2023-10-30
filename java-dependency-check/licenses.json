@@ -27,7 +27,8 @@
         "LGPL-3.0",
         "EPL-1.0",
         "EPL-2.0",
-        "W3C-20150513"
+        "W3C-20150513",
+        "GPL-2.0-with-classpath-exception"
     ],
     "stop": [
         "GPL-2.0",
