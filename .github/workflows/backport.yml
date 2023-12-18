@@ -1,0 +1,39 @@
+name: Backport merged pull request
+on:
+  pull_request_target:
+    types: [closed, labeled]
+permissions:
+  contents: write # so it can comment
+  pull-requests: write # so it can create pull requests
+jobs:
+  backport:
+    name: Backport pull request
+    runs-on: ubuntu-latest
+    # Don't run on closed unmerged pull requests
+    if: github.event.pull_request.merged
+    steps:
+      - name: Import Secrets
+        id: secrets
+        uses: hashicorp/vault-action@v2.4.3
+        with:
+          url: ${{ secrets.VAULT_ADDR }}
+          method: approle
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          exportEnv: false
+          secrets: |
+            secret/data/products/cambpm/ci/github-workflow GITHUB_APP_ID;
+            secret/data/products/cambpm/ci/github-workflow GITHUB_APP_PRIVATE_KEY;
+      - name: Generate token for GitHub
+        id: generate-github-token
+        uses: tibdex/github-app-token@v1
+        with:
+          app_id: ${{ steps.secrets.outputs.GITHUB_APP_ID }}
+          private_key: ${{ steps.secrets.outputs.GITHUB_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v4
+      - name: Create backport pull requests
+        uses: tasso94/backport-action@main
+        with:
+          github_token: ${{ steps.generate-github-token.outputs.token }}
+          target_owner: ${{ github.repository_owner }}
+          target_repo: ${{ github.event.repository.name }}-maintenance
