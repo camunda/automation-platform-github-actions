@@ -1,7 +1,18 @@
 name: Backport merged pull request
 on:
-  pull_request_target:
-    types: [closed, labeled]
+  workflow_call:
+    inputs:
+      ref:
+        description: 'The reference of the github commit of the reusable workflow. Must match the specified branch/tag/commit where the workflow is called. Workaround to https://github.com/actions/runner/issues/2417. Should never be untrusted content.'
+        default: 'main'
+        type: string
+    secrets:
+      VAULT_ADDR:
+        required: true
+      VAULT_ROLE_ID:
+        required: true
+      VAULT_SECRET_ID:
+        required: true
 permissions:
   contents: write # so it can comment
   pull-requests: write # so it can create pull requests
