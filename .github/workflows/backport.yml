@@ -50,4 +50,4 @@ jobs:
           target_repo: ${{ github.event.repository.name }}-maintenance
           pull_description:  |-
             # Description
-            Backport of ${{ github.repository_owner }}/${{ github.event.repository.name }}/#${pull_number} to `${target_branch}`.
+            Backport of ${{ github.repository_owner }}/${{ github.event.repository.name }}#${pull_number} to `${target_branch}`.
