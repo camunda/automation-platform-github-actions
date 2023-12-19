@@ -48,3 +48,6 @@ jobs:
           github_token: ${{ steps.generate-github-token.outputs.token }}
           target_owner: ${{ github.repository_owner }}
           target_repo: ${{ github.event.repository.name }}-maintenance
+          pull_description:  |-
+            # Description
+            Backport of ${{ github.repository_owner }}/${{ github.event.repository.name }}/#${pull_number} to `${target_branch}`.
