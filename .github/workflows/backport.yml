@@ -52,3 +52,6 @@ jobs:
             # Description
             Backport of ${{ github.repository_owner }}/${{ github.event.repository.name }}#${pull_number} to `${target_branch}`.
           pull_branchname: ${target_branch}-backport-${pull_number}
+          copy_assignees: true
+          copy_requested_reviewers: true
+          copy_labels_pattern: ^backport:([^ ]+)$
