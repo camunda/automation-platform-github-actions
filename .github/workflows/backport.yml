@@ -51,3 +51,4 @@ jobs:
           pull_description:  |-
             # Description
             Backport of ${{ github.repository_owner }}/${{ github.event.repository.name }}#${pull_number} to `${target_branch}`.
+          pull_branchname: ${target}-backport-${pull_number}
