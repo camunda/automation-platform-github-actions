@@ -45,7 +45,6 @@ jobs:
       - name: Create backport pull requests
         uses: tasso94/backport-action@main
         with:
-          #github_token: ${{ steps.generate-github-token.outputs.token }}
-          github_token: ${{ secrets.MY_TOKEN }}
+          github_token: ${{ steps.generate-github-token.outputs.token }}
           target_owner: ${{ github.repository_owner }}
           target_repo: ${{ github.event.repository.name }}-maintenance
