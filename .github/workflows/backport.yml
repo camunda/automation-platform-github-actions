@@ -51,12 +51,14 @@ jobs:
           app_id: ${{ steps.secrets.outputs.GITHUB_APP_ID }}
           private_key: ${{ steps.secrets.outputs.GITHUB_APP_PRIVATE_KEY }}
       - uses: actions/checkout@v4
+        with:
+          token: ${{ steps.generate-github-token.outputs.token }}
       - name: Create backport pull requests
         uses: tasso94/backport-action@main
         with:
           github_token: ${{ steps.generate-github-token.outputs.token }}
-          target_owner: ${{ github.repository_owner }}
-          target_repo: ${{ github.event.repository.name }}-maintenance
+          experimental: |- 
+            { "remote_owner": "${{ github.repository_owner }}", "remote_repo": "${{ github.event.repository.name }}-maintenance"}
           pull_description:  |-
             # Description
             Backport of ${{ github.repository_owner }}/${{ github.event.repository.name }}#${pull_number} to `${target_branch}`.
