@@ -66,5 +66,5 @@ jobs:
           pull_branchname: ${target_branch}-backport-${pull_number}
           copy_assignees: true
           copy_requested_reviewers: true
-          label_pattern: ^backport:([^ ]+)$
+          label_pattern: ^bot:backport:([^ ]+)$
           copy_labels_pattern: ^ci:([^ ]+)$
