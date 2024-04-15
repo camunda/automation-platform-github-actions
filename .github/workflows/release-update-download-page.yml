@@ -1,4 +1,4 @@
-name: "Update Download Page for Alpha Release"
+name: Release Update Download Page
 
 on: 
   workflow_dispatch:
