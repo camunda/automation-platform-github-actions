@@ -1,0 +1,52 @@
+name: Update Download Page for Alpha Release
+# could be workflow_dispatch? 
+on: [workflow_call]
+  inputs:
+    version:
+      description: 'The version of the alpha release'
+      required: true
+    DRI:
+      description: 'The release DRIs github nick'
+      required: true
+    date:
+      description: 'The release date'
+      required: true
+jobs:
+  update-doc:
+    runs-on: ubuntu-latest
+    name: update static docs
+    steps:
+      - name: Import Secrets
+        id: secrets
+        uses: hashicorp/vault-action@v2.4.3
+        with:
+          url: ${{ secrets.VAULT_ADDR }}
+          method: approle
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          exportEnv: false
+          secrets: |
+            secret/data/products/cambpm/ci/github-workflow GITHUB_APP_ID;
+            secret/data/products/cambpm/ci/github-workflow GITHUB_APP_PRIVATE_KEY;
+      - name: Generate token for GitHub
+        id: generate-github-token
+        uses: tibdex/github-app-token@v1
+        with:
+          app_id: ${{ steps.secrets.outputs.GITHUB_APP_ID }}
+          private_key: ${{ steps.secrets.outputs.GITHUB_APP_PRIVATE_KEY }}
+      - name: Checkout camunda-docs-static dir
+        id: release-update-download-page
+        uses: actions/checkout@v3
+        with:
+          repository: camunda/camunda-docs-static
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: camunda-docs-static
+          ref: ${{ inputs.ref }} # github.job_workflow_sha seems to be the documented parameter to resolve this, but doesn't
+      - name: Update Download Page and Create PR for alpha release
+        id: release-create-pr
+        uses: camunda/automation-platform-github-actions/release-update-download-page@main
+        with:
+          version: ${{ input.version }}
+          date: ${{ inputs.date }}
+          DRI: ${{ inputs.DRI }}
+          GITHUB_TOKEN: ${{ steps.generate-github-token.outputs.token }}
