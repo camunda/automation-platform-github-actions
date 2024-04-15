@@ -14,7 +14,7 @@ on:
         required: true
 
 jobs:
-  call-reusable-flow:
+  release-update-download-page:
     runs-on: ubuntu-latest
     name: update static docs
     steps:
