@@ -1,5 +1,5 @@
-name: Update Download Page for Alpha Release
-# could be workflow_dispatch? 
+name: "Update Download Page for Alpha Release"
+
 on: 
   workflow_call:
     inputs:
