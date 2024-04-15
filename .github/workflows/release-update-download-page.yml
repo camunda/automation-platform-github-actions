@@ -46,7 +46,7 @@ jobs:
           ref: ${{ inputs.ref }} # github.job_workflow_sha seems to be the documented parameter to resolve this, but doesn't
       - name: Update Download Page and Create PR for alpha release
         id: release-create-pr
-        uses: camunda/automation-platform-github-actions/release-update-download-page@main
+        uses: camunda/automation-platform-github-actions/release-update-download-page@innovation-week-alpha-update-download-page
         with:
           version: ${{ input.version }}
           date: ${{ inputs.date }}
