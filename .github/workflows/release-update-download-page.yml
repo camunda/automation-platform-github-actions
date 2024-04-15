@@ -1,16 +1,18 @@
 name: Update Download Page for Alpha Release
 # could be workflow_dispatch? 
-on: [workflow_call]
-  inputs:
-    version:
-      description: 'The version of the alpha release'
-      required: true
-    DRI:
-      description: 'The release DRIs github nick'
-      required: true
-    date:
-      description: 'The release date'
-      required: true
+on: 
+  workflow_call:
+    inputs:
+      version:
+        description: 'The version of the alpha release'
+        required: true
+      DRI:
+        description: 'The release DRIs github nick'
+        required: true
+      date:
+        description: 'The release date'
+        required: true
+
 jobs:
   update-doc:
     runs-on: ubuntu-latest
