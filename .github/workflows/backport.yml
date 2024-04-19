@@ -59,11 +59,11 @@ jobs:
         with:
           github_token: ${{ steps.generate-github-token.outputs.token }}
           experimental: |- 
-            { "remote_owner": "${{ github.repository_owner }}", "remote_repo": "${{ github.event.repository.name }}-maintenance"}
+            { "downstream_repo": "${{ github.event.repository.name }}-maintenance"}
           pull_description:  |-
             # Description
             Backport of ${{ github.repository_owner }}/${{ github.event.repository.name }}#${pull_number} to `${target_branch}`.
-          pull_branchname: ${target_branch}-backport-${pull_number}
+          branch_name: ${target_branch}-backport-${pull_number}
           copy_assignees: true
           copy_requested_reviewers: true
           label_pattern: ^bot:backport:([^ ]+)$
