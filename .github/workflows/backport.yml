@@ -55,7 +55,7 @@ jobs:
         with:
           token: ${{ steps.generate-github-token.outputs.token }}
       - name: Create backport pull requests
-        uses: tasso94/backport-action@main
+        uses: korthout/backport-action@main
         with:
           github_token: ${{ steps.generate-github-token.outputs.token }}
           experimental: |- 
