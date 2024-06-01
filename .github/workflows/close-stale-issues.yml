@@ -1,7 +1,8 @@
-name: 'Close stale issues and PRs'
+name: Close stale issues and PRs
+
 on:
   schedule:
-    - cron: '0 0 8 ? * WED,SAT *'
+    - cron: '0 4 * * 3,6'
   workflow_dispatch:  # can be used to trigger the workflow manually
 
 jobs:
