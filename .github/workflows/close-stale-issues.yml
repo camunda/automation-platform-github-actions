@@ -1,0 +1,23 @@
+name: Close stale issues and PRs
+
+on:
+  schedule:
+    - cron: '0 4 * * 3,6'
+  workflow_dispatch:  # can be used to trigger the workflow manually
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          close-issue-message: 'Closing due to lack of requested feedback. If you would like us to look at this issue, please provide the requested information to re-open the issue.'
+          close-pr-message: 'Closing due to lack of requested feedback. If you would like us to look at this, please provide the requested information to re-open the PR.'
+          close-issue-label: 'group:closed-as-inactive'
+          close-pr-label: 'group:closed-as-inactive'
+          days-before-stale: 0
+          days-before-close: 1
+          only-labels: 'group:requested-info'
+          exempt-issue-labels: 'group:info-provided'
+          exempt-pr-labels: 'group:info-provided'
+#          operations-per-run: 300
