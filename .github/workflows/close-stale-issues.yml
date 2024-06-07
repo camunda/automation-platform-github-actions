@@ -15,8 +15,10 @@ jobs:
           close-pr-message: 'Closing due to lack of requested feedback. If you would like us to look at this, please provide the requested information to re-open the PR.'
           close-issue-label: 'group:closed-as-inactive'
           close-pr-label: 'group:closed-as-inactive'
+          stale-issue-label: 'group:stale'
+          stale-pr-label: 'group:stale'
           days-before-stale: 0
-          days-before-close: 1
+          days-before-close: 7
           only-labels: 'group:requested-info'
           exempt-issue-labels: 'group:info-provided'
           exempt-pr-labels: 'group:info-provided'
