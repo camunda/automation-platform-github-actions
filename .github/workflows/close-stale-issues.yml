@@ -1,9 +1,9 @@
 name: Close stale issues and PRs
 
 on:
-  schedule:
-    - cron: '0 4 * * 3,6'
-  workflow_dispatch:  # can be used to trigger the workflow manually
+#  schedule:
+#    - cron: '0 4 * * 3,6'
+  workflow_call:  # can be called by another workflow
 
 jobs:
   stale:
