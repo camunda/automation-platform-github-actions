@@ -6,6 +6,11 @@ on:
         description: 'The reference of the github commit of the reusable workflow. Must match the specified branch/tag/commit where the workflow is called. Workaround to https://github.com/actions/runner/issues/2417. Should never be untrusted content.'
         default: 'main'
         type: string
+      experimental:
+        description: 'Configure experimental features by passing a JSON object.'
+        default: |- 
+          { "downstream_repo": "${{ github.event.repository.name }}-maintenance"}
+        type: string
     secrets:
       VAULT_ADDR:
         required: true
@@ -58,8 +63,7 @@ jobs:
         uses: korthout/backport-action@main
         with:
           github_token: ${{ steps.generate-github-token.outputs.token }}
-          experimental: |- 
-            { "downstream_repo": "${{ github.event.repository.name }}-maintenance"}
+          experimental: ${{ inputs.experimental }}
           pull_description:  |-
             # Description
             Backport of ${{ github.repository_owner }}/${{ github.event.repository.name }}#${pull_number} to `${target_branch}`.
