@@ -1,0 +1,27 @@
+name: 'Update Download Page and Create PR for alpha release'
+description: 'Updated the download options after an alpha release is available'
+inputs:
+  version:
+    description: 'The version of the alpha release'
+    required: true
+  DRI:
+    description: 'The release DRIs github nick'
+    required: true
+  date:
+    description: 'The release date'
+    required: true
+  GITHUB_TOKEN:
+    description: 'Github Token'
+    required: true
+runs:
+  - name: Update Download ReadME
+    env:
+      minorVersion: ${{ input.version }}
+      releaseDate: ${{ inputs.date }}
+    run: ./update-docs.sh
+  - name: Create pull-request
+    env:
+      GITHUB_WORKSPACE: ${{GITHUB_WORKSPACE}}
+      DRI: ${{ inputs.DRI }}
+      GH_TOKEN: ${{ inputs.GITHUB_TOKEN }}
+    run: ./create-pr.sh
