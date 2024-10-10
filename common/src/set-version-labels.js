@@ -32,7 +32,7 @@ module.exports = async function () {
         console.log(`Get labels with prefix for issue: #${issueNumber}`);
         try {
             // Get issue details, which includes labels
-            const { data: issue } = await octokit.issues.get({
+            const { data: issue } = await octokit.rest.issues.get({
                 owner,
                 repo,
                 issue_number: issueNumber,
