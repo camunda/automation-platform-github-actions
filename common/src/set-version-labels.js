@@ -29,7 +29,7 @@ module.exports = async function () {
     }
 
     const getLabelsMatchingRegexp = async function (owner, repo, issueNumber, expression) {
-        console.log(`Get labels with prefix for issue: #${issueNumber}`);
+        console.log(`Get labels for issue: #${issueNumber} that match expression: ${expression}`);
         try {
             // Get issue details, which includes labels
             const { data: issue } = await octokit.rest.issues.get({
@@ -77,8 +77,7 @@ module.exports = async function () {
 
     console.log(`read repo information repoName: ${repoName} - : owner: ${owner}`)
 
-
-    const expression = `potential:(\d)+.(\d)+.(\d)+`
+    const expression = `potential:\\d+\\.\\d+\\.\\d+`
     const potentialLabels = await getLabelsMatchingRegexp(owner, repoName, issueNumber, expression);
 
 
