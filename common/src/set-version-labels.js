@@ -15,7 +15,7 @@ module.exports = async function () {
         console.log(`Remove labels for issue #${issueNumber}:`, labels);
         try {
             for (const label of labels) {
-                await octokit.issues.removeLabel({
+                await octokit.rest.issues.removeLabel({
                     owner,
                     repo,
                     issue_number: issueNumber,
@@ -55,7 +55,7 @@ module.exports = async function () {
     const setLabels = async function (owner, repo, issueNumber, labels) {
         console.log(`Set labels for issue: #${issueNumber}:`, labels);
         try {
-            await octokit.issues.addLabels({
+            await octokit.rest.issues.addLabels({
                 owner,
                 repo,
                 issue_number: issueNumber,
