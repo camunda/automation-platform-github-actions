@@ -79,8 +79,8 @@ module.exports = async function () {
 
     const potentialLabels = await getLabelsWithPrefix(owner, repoName, issueNumber, `potential:`);
 
-    if(potentialLabels == null) {
-        console.log("no `potential` label found")
+    if (!potentialLabels.length) {
+        console.log("no `potential:` label found, exiting.")
         return;
     }
 
