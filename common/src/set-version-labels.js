@@ -28,7 +28,7 @@ module.exports = async function () {
         }
     }
 
-    const getLabelsWithPrefix = async function (owner, repo, issueNumber, prefix) {
+    const getLabelsMatchingRegexp = async function (owner, repo, issueNumber, expression) {
         console.log(`Get labels with prefix for issue: #${issueNumber}`);
         try {
             // Get issue details, which includes labels
@@ -38,13 +38,14 @@ module.exports = async function () {
                 issue_number: issueNumber,
             });
 
+            const regexp = new RegExp(expression);
 
             // Filter labels that start with the specified prefix
             const matchingLabels = issue.labels
-                .map(label => label.name)
-                .filter(label => label.startsWith(prefix));
+            .map(label => label.name)
+            .filter(label => regexp.test(label));
 
-            console.log(`Labels starting with "${prefix}":`, matchingLabels);
+            console.log(`Labels matching "${expression}":`, matchingLabels);
             return matchingLabels;
         } catch (error) {
             console.error('Error fetching issue labels:', error);
@@ -77,14 +78,16 @@ module.exports = async function () {
     console.log(`read repo information repoName: ${repoName} - : owner: ${owner}`)
 
 
-    const potentialLabels = await getLabelsWithPrefix(owner, repoName, issueNumber, `potential:`);
+    const expression = `potential:(\d)+.(\d)+.(\d)+`
+    const potentialLabels = await getLabelsMatchingRegexp(owner, repoName, issueNumber, expression);
+
 
     if (!potentialLabels.length) {
         console.log("no `potential:` label found, exiting.")
         return;
     }
 
-    const versionLabels = getListWithNewPrefix(potentialLabels, "potential", "version");
+    const versionLabels = getListWithNewPrefix(potentialLabels, "potential:", "version:");
 
     await removeLabels(owner, repoName, issueNumber, potentialLabels);
     await setLabels(owner, repoName, issueNumber, versionLabels);
