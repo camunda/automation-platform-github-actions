@@ -38,6 +38,7 @@ module.exports = async function () {
                 issue_number: issueNumber,
             });
 
+
             // Filter labels that start with the specified prefix
             const matchingLabels = issue.labels
                 .map(label => label.name)
@@ -68,10 +69,15 @@ module.exports = async function () {
     const repoToken = core.getInput('repo-token');
     const octokit = github.getOctokit(repoToken);
     const repo = github.context.payload.repository;
+    const repoName = repo.name;
     const owner = repo.owner.login;
+
     const issueNumber = core.getInput('issue-number');
 
-    const potentialLabels = await getLabelsWithPrefix(owner, repo, issueNumber, `potential:`);
+    console.log(`read repo information repoName: ${repoName} - : owner: ${owner}`)
+
+
+    const potentialLabels = await getLabelsWithPrefix(owner, repoName, issueNumber, `potential:`);
 
     if(potentialLabels == null) {
         console.log("no `potential` label found")
@@ -80,6 +86,6 @@ module.exports = async function () {
 
     const versionLabels = getListWithNewPrefix(potentialLabels, "potential", "version");
 
-    await removeLabels(owner, repo, issueNumber, potentialLabels);
-    await setLabels(owner, repo, issueNumber, versionLabels);
+    await removeLabels(owner, repoName, issueNumber, potentialLabels);
+    await setLabels(owner, repoName, issueNumber, versionLabels);
 }
