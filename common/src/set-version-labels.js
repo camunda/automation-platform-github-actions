@@ -2,7 +2,7 @@ const core = require('@actions/core');
 const github = require('@actions/github');
 
 module.exports = async function () {
-    const replacePrefix = function (strings, oldPrefix, newPrefix) {
+    const getListWithNewPrefix = function (strings, oldPrefix, newPrefix) {
         return strings.map(str => {
             if (str.startsWith(oldPrefix)) {
                 return newPrefix + str.slice(oldPrefix.length);
@@ -71,8 +71,14 @@ module.exports = async function () {
     const owner = repo.owner.login;
     const issueNumber = core.getInput('issue-number');
 
-    const potentialLabels = await getLabelsWithPrefix(owner, repo, issueNumber, `potential`);
-    const versionLabels = replacePrefix(potentialLabels, "potential", "version");
+    const potentialLabels = await getLabelsWithPrefix(owner, repo, issueNumber, `potential:`);
+
+    if(potentialLabels == null) {
+        console.log("no `potential` label found")
+        return;
+    }
+
+    const versionLabels = getListWithNewPrefix(potentialLabels, "potential", "version");
 
     await removeLabels(owner, repo, issueNumber, potentialLabels);
     await setLabels(owner, repo, issueNumber, versionLabels);
