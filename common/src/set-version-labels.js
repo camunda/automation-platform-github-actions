@@ -2,19 +2,19 @@ const core = require('@actions/core');
 const github = require('@actions/github');
 const octokit = require("@octokit/rest")();
 
-const execute = async function () {
+module.exports = async function () {
     const repo = github.context.payload.repository;
     const owner = repo.owner.login;
     const issueNumber = core.getInput('issue');
 
     const potentialLabels = await getLabelsWithPrefix(owner, repo, issueNumber, `potential`);
-    const versionLabels = await replacePrefix(potentialLabels, "potential", "version");
+    const versionLabels = replacePrefix(potentialLabels, "potential", "version");
 
     await removeLabels(owner, repo, issueNumber, potentialLabels);
     await setLabels(owner, repo, issueNumber, versionLabels);
 }
 
-const replacePrefix = async function(strings, oldPrefix, newPrefix) {
+const replacePrefix = function(strings, oldPrefix, newPrefix) {
     return strings.map(str => {
         if (str.startsWith(oldPrefix)) {
             return newPrefix + str.slice(oldPrefix.length);

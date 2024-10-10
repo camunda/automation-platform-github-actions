@@ -1,3 +1,3 @@
-const common = require('../common/src/set-version-labels.js');
+const issueTools = require('../common/dist/index.js');
 
-common.execute();
+issueTools.setVersionLabels();
