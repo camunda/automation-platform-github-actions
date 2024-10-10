@@ -1,0 +1,19 @@
+name: Label issues
+
+on: 
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: 'Number of the issue'
+        required: true
+
+jobs:
+  version-label-automation-manual:
+    runs-on: ubuntu-latest
+    name: version-label-automation
+    steps:
+      - name: version-label-automation-step
+        id: version-label-automation-step
+        uses: camunda/automation-platform-github-actions/version-label-automation-manual@Version-Labels-Automation
+        with: 
+          issue: ${{ github.event.inputs.issue }}
