@@ -17,3 +17,4 @@ jobs:
         uses: camunda/automation-platform-github-actions/version-label-automation-manual@Version-Labels-Automation
         with: 
           issue: ${{ github.event.inputs.issue }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
