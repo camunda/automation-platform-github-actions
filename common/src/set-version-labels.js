@@ -32,16 +32,14 @@ module.exports = async function () {
         console.log(`Get labels with prefix for issue: #${issueNumber}`);
         try {
             // Get issue details, which includes labels
-            const response = await octokit.issues.get({
+            const { data: issue } = await octokit.issues.get({
                 owner,
                 repo,
                 issue_number: issueNumber,
             });
 
-            if(!response) return [];
-
             // Filter labels that start with the specified prefix
-            const matchingLabels = response.issue.labels
+            const matchingLabels = issue.labels
                 .map(label => label.name)
                 .filter(label => label.startsWith(prefix));
 
@@ -75,7 +73,7 @@ module.exports = async function () {
 
     const potentialLabels = await getLabelsWithPrefix(owner, repo, issueNumber, `potential:`);
 
-    if( !potentialLabels.length ) {
+    if(potentialLabels == null) {
         console.log("no `potential` label found")
         return;
     }
