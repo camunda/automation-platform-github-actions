@@ -86,7 +86,7 @@ module.exports = async function () {
     }
 
     const getMinorFromPotentialLabel = function (potentialLabel) {
-        const regex = /potential:(\d+\.\d+)\.\d+/; // TODO we can adapt the regepx to only match up to minor version (ignoring patch version)
+        const regex = /potential:(\d+\.\d+)\.\d+/;
         const match = potentialLabel.match(regex);
 
         return match ? match[1] : null;
