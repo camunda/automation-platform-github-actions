@@ -88,6 +88,6 @@ module.exports = async function () {
 
     const versionLabels = getListWithNewPrefix(potentialLabels, "potential:", "version:");
 
-    await removeLabels(owner, repoName, issueNumber, potentialLabels);
     await setLabels(owner, repoName, issueNumber, versionLabels);
+    await removeLabels(owner, repoName, issueNumber, potentialLabels);
 }
