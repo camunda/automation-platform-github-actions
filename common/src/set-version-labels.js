@@ -1,5 +1,6 @@
 const core = require('@actions/core');
 const github = require('@actions/github');
+const https = require('https');
 
 module.exports = async function () {
 
@@ -7,13 +8,18 @@ module.exports = async function () {
 
     const getVersionLabels = async function (potentialLabels, latestMinorVersion) {
         const promises = potentialLabels.map(async potentialLabel => {
+
             const minorVersion = getMinorFromPotentialLabel(potentialLabel);
 
-            if (minorVersion === latestMinorVersion) {
-                // For latest version, calculate the version label right away
+            if (minorVersion === latestMinorVersion) { // For latest version, calculate the version label right away
                 const calculatedVersion = getVersionLabelFromPotential(potentialLabel);
                 console.log(`Returning calculated version for latest potential version: ${calculatedVersion}`);
                 return calculatedVersion;
+            }
+
+            if (potentialLabel.endsWith('0')) { // For potential versions that are not patch
+                console.log(`label ${potentialLabel} is not a patch version, filtering it out.`);
+                return null;
             }
 
             // For maintenance versions, find the latest patch from repo
@@ -23,10 +29,10 @@ module.exports = async function () {
             if (!latestPatchVersion) {
                 const calculatedVersionLabel = getVersionLabelFromPotential(potentialLabel); // fallback if GitHub is down, pom version is wrong, error at parsing
                 console.log(`No latest patch version found for potential label: ${potentialLabel}, returning calculated version ${calculatedVersionLabel}`);
-                return calculatedVersionLabel;
+                return getNextPatchVersion(calculatedVersionLabel);
             }
 
-            return latestPatchVersion;
+            return getNextPatchVersion(latestPatchVersion);;
         });
 
         // Wait for all promises to settle and filter out null values
@@ -86,6 +92,12 @@ module.exports = async function () {
         return match ? match[1] : null;
     }
 
+    const getNextPatchVersion = function (currentVersion) {
+        const versionParts = currentVersion.split('.');
+        versionParts[2] = parseInt(versionParts[2]) + 1;
+        return versionParts.join('.');
+    }
+
     const getLatestPatchVersion = async function (potentialLabel) {
         console.log(`Get latest patch version for issue: #${issueNumber} for potential label:`, potentialLabel);
         try {
@@ -98,15 +110,25 @@ module.exports = async function () {
                 console.log(`Minor version found: ${minorVersion}`);
             }
 
-            const maintenanceRepoName = 'camunda-bpm-platform-maintenance';
-            const pomXML = await getFileContent(owner, maintenanceRepoName, 'pom.xml', minorVersion);
-
-            // Define regex to match <version>...</version>
-            const patchVersionRegex = /<artifactId>camunda-root<\/artifactId>\s*<version>(\d+\.\d+\.\d+)(?:-\w+)?<\/version>/;
-            const match = pomXML.match(patchVersionRegex);  //FIXME something is not working here
-
+            const patchVersionRegex = new RegExp(`(camDownloads\\.branches\\['${minorVersion}'\\]\\s*=\\s*)(\\[[\\s\\S]*?\\])(\\s*;)`);
+            const matchJson = downloadPage.match(patchVersionRegex);
+        
             // Return the version if found, otherwise return null
-            return match ? match[1] : null;
+            let versionsJsonString = matchJson ? matchJson[2] : null;
+
+            if (versionsJsonString == null) {
+                console.log(`No patch version could be extracted for potential label: ${potentialLabel}. Returning null.`);
+                return null;
+            }
+
+            console.log(`Patch Versions to fetch first element:`, versionsJsonString);
+
+            const extractFirstPatchVersionFromJson = new RegExp(`(number\\: ')(.*)('\\,)`);
+            const matchFirstPatch = versionsJsonString.match(extractFirstPatchVersionFromJson);
+            let firstPatchVersion = matchFirstPatch ? matchFirstPatch[2] : null;
+
+            console.log(`The latest version is: ${firstPatchVersion}`);
+            return `version:` + firstPatchVersion;
         } catch (error) {
             console.error("Error fetching the XML document:", error);
             return null;
@@ -125,22 +147,30 @@ module.exports = async function () {
         return match ? match[1] : null;
     }
 
-    async function getFileContent(owner, repo, path, ref) {
-        try {
-          const response = await octokit.rest.repos.getContent({
-            owner,
-            repo,
-            path,
-            ref, // branch name, commit SHA, or tag
-          });
-      
-          // The content is base64 encoded, so we need to decode it
-          const fileContent = Buffer.from(response.data.content, 'base64').toString('utf-8');
-          console.log(fileContent);
-          return fileContent
-        } catch (error) {
-          console.error("Error fetching file:", error);
-        }
+    async function fetchDownloadPage() {
+        const url = `https://docs.camunda.org/enterprise/download/`;
+    
+        return new Promise((resolve, reject) => {
+            https.get(url, (response) => {
+                let data = '';
+    
+                if (response.statusCode !== 200) {
+                    reject(new Error(`Failed to fetch data. Status code: ${response.statusCode}`));
+                    response.resume(); // Consume response data to free up memory
+                    return;
+                }
+    
+                response.on('data', (chunk) => {
+                    data += chunk;
+                });
+    
+                response.on('end', () => {
+                    resolve(data);
+                });
+            }).on('error', (error) => {
+                reject(error);
+            });
+        });
     }
 
     const setLabels = async function (owner, repo, issueNumber, labels) {
@@ -176,12 +206,14 @@ module.exports = async function () {
         return;
     }
 
+    const downloadPage = await fetchDownloadPage();
+
     const latestVersion = await getLatestMinorVersion();
     console.log(`Latest minor version: ${latestVersion}`);
 
     const versionLabels = await getVersionLabels(potentialLabels, latestVersion);
-    console.log(versionLabels);
+    const uniqueVersionLabels =  [...new Set(versionLabels)];
 
-    await setLabels(owner, repoName, issueNumber, versionLabels);
+    await setLabels(owner, repoName, issueNumber, uniqueVersionLabels);
     await removeLabels(owner, repoName, issueNumber, potentialLabels);
 }
