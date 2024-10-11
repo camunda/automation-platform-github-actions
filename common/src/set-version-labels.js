@@ -5,11 +5,11 @@ module.exports = async function () {
 
     // Get Version Labels
 
-    const getVersionLabels = async function (potentialLabels, latestVersion) {
+    const getVersionLabels = async function (potentialLabels, latestMinorVersion) {
         const promises = potentialLabels.map(async potentialLabel => {
             const minorVersion = getMinorFromPotentialLabel(potentialLabel);
 
-            if (minorVersion === latestVersion) {
+            if (minorVersion === latestMinorVersion) {
                 // For latest version, calculate the version label right away
                 const calculatedVersion = getVersionLabelFromPotential(potentialLabel);
                 console.log(`Returning calculated version for latest potential version: ${calculatedVersion}`);
@@ -80,7 +80,7 @@ module.exports = async function () {
     }
 
     const getMinorFromPotentialLabel = function (potentialLabel) {
-        const regex = /potential:(\d+\.\d+)\.\d+/;
+        const regex = /potential:(\d+\.\d+)\.\d+/; // TODO we can adapt the regepx to only match up to minor version (ignoring patch version)
         const match = potentialLabel.match(regex);
 
         return match ? match[1] : null;
@@ -98,16 +98,12 @@ module.exports = async function () {
                 console.log(`Minor version found: ${minorVersion}`);
             }
 
-            const url = `https://github.com/camunda/camunda-bpm-platform-maintenance/raw/refs/heads/${minorVersion}/pom.xml`;
-
-            const response = await fetch(url);
-            const xml = await response.text();
-
-            console.log(xml)
+            const maintenanceRepoName = 'camunda-bpm-platform-maintenance';
+            const pomXML = await getFileContent(owner, maintenanceRepoName, 'pom.xml', minorVersion);
 
             // Define regex to match <version>...</version>
             const patchVersionRegex = /<artifactId>camunda-root<\/artifactId>\s*<version>(\d+\.\d+\.\d+)(?:-\w+)?<\/version>/;
-            const match = xml.match(patchVersionRegex);  //FIXME something is not working here
+            const match = pomXML.match(patchVersionRegex);  //FIXME something is not working here
 
             // Return the version if found, otherwise return null
             return match ? match[1] : null;
@@ -117,7 +113,7 @@ module.exports = async function () {
         }
     }
 
-    const getLatestVersion = async function() {
+    const getLatestMinorVersion = async function() {
         const url = `https://github.com/camunda/camunda-bpm-platform/raw/refs/heads/master/pom.xml`;
         const response = await fetch(url);
         const pomXml = await response.text();
@@ -127,6 +123,24 @@ module.exports = async function () {
 
         // Return the version if found, otherwise return null
         return match ? match[1] : null;
+    }
+
+    async function getFileContent(owner, repo, path, ref) {
+        try {
+          const response = await octokit.rest.repos.getContent({
+            owner,
+            repo,
+            path,
+            ref, // branch name, commit SHA, or tag
+          });
+      
+          // The content is base64 encoded, so we need to decode it
+          const fileContent = Buffer.from(response.data.content, 'base64').toString('utf-8');
+          console.log(fileContent);
+          return fileContent
+        } catch (error) {
+          console.error("Error fetching file:", error);
+        }
     }
 
     const setLabels = async function (owner, repo, issueNumber, labels) {
@@ -162,8 +176,8 @@ module.exports = async function () {
         return;
     }
 
-    const latestVersion = await getLatestVersion();
-    console.log(`Latest version: ${latestVersion}`);
+    const latestVersion = await getLatestMinorVersion();
+    console.log(`Latest minor version: ${latestVersion}`);
 
     const versionLabels = await getVersionLabels(potentialLabels, latestVersion);
     console.log(versionLabels);
