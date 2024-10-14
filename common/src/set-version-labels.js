@@ -6,10 +6,10 @@ module.exports = async function () {
 
     // Get Version Labels
 
-    const getVersionLabels = async function (potentialLabels, latestMinorVersion) {
+    const getVersionLabels = async function (potentialLabels) {
         const promises = potentialLabels.map(async potentialLabel => {
 
-            if ( potentialLabel.split('.')[2] === '0') { // For potential versions that are not patch
+            if (potentialLabel.split('.')[2] === '0') { // For potential versions that are not patch
                 console.log(`label ${potentialLabel} is not a patch version, filtering it out.`);
                 return null;
             }
@@ -25,10 +25,6 @@ module.exports = async function () {
         const results = await Promise.all(promises);
         return results.filter(label => label !== null);
     };
-
-    const getVersionLabelFromPotential = function (potentialLabel) {
-        return `version:` + potentialLabel.slice(`potential:`.length);
-    }
 
     const removeLabels = async function (owner, repo, issueNumber, labels) {
         console.log(`Remove labels for issue #${issueNumber}:`, labels);
@@ -61,8 +57,8 @@ module.exports = async function () {
 
             // Filter labels that start with the specified prefix
             const matchingLabels = issue.labels
-            .map(label => label.name)
-            .filter(label => regexp.test(label));
+                .map(label => label.name)
+                .filter(label => regexp.test(label));
 
             console.log(`Labels matching "${expression}":`, matchingLabels);
             return matchingLabels;
@@ -182,13 +178,13 @@ module.exports = async function () {
 
     const issueNumber = core.getInput('issue-number');
 
-    console.log(`read repo information repoName: ${repoName} - : owner: ${owner}`)
+    console.log(`read repo information repoName: ${repoName} - : owner: ${owner}`);
 
     const expression = `potential:\\d+\\.\\d+\\.\\d+`
     const potentialLabels = await getLabelsMatchingRegexp(owner, repoName, issueNumber, expression);
 
     if (!potentialLabels.length) {
-        console.log("no `potential:` label found, exiting.")
+        console.log("no `potential:` label found, exiting.");
         return;
     }
 
@@ -197,8 +193,8 @@ module.exports = async function () {
     const latestVersion = await getLatestMinorVersion();
     console.log(`Latest minor version: ${latestVersion}`);
 
-    const versionLabels = await getVersionLabels(potentialLabels, latestVersion);
-    const uniqueVersionLabels =  [...new Set(versionLabels)];
+    const versionLabels = await getVersionLabels(potentialLabels);
+    const uniqueVersionLabels = [...new Set(versionLabels)];
 
     await setLabels(owner, repoName, issueNumber, uniqueVersionLabels);
     await removeLabels(owner, repoName, issueNumber, potentialLabels);
