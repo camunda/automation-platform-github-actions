@@ -9,15 +9,7 @@ module.exports = async function () {
     const getVersionLabels = async function (potentialLabels, latestMinorVersion) {
         const promises = potentialLabels.map(async potentialLabel => {
 
-            const minorVersion = getMinorFromPotentialLabel(potentialLabel);
-
-            if (minorVersion === latestMinorVersion) { // For latest version, calculate the version label right away
-                const calculatedVersion = getVersionLabelFromPotential(potentialLabel);
-                console.log(`Returning calculated version for latest potential version: ${calculatedVersion}`);
-                return calculatedVersion;
-            }
-
-            if (potentialLabel.endsWith('0')) { // For potential versions that are not patch
+            if ( potentialLabel.split('.')[2] === '0') { // For potential versions that are not patch
                 console.log(`label ${potentialLabel} is not a patch version, filtering it out.`);
                 return null;
             }
@@ -26,13 +18,7 @@ module.exports = async function () {
             const latestPatchVersion = await getLatestPatchVersion(potentialLabel);
             console.log(`${potentialLabel} => has Latest Patch Version: ${latestPatchVersion}`);
 
-            if (!latestPatchVersion) {
-                const calculatedVersionLabel = getVersionLabelFromPotential(potentialLabel); // fallback if GitHub is down, pom version is wrong, error at parsing
-                console.log(`No latest patch version found for potential label: ${potentialLabel}, returning calculated version ${calculatedVersionLabel}`);
-                return getNextPatchVersion(calculatedVersionLabel);
-            }
-
-            return getNextPatchVersion(latestPatchVersion);;
+            return getNextPatchVersion(latestPatchVersion);
         });
 
         // Wait for all promises to settle and filter out null values
