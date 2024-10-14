@@ -1,11 +1,9 @@
-name: "Test: Set Version Labels"
+name: Set Version Labels
 
-on: 
-  workflow_dispatch:
-    inputs:
-      issue:
-        description: 'Number of the issue'
-        required: true
+on:
+  issues:
+    types:
+      - closed
 
 jobs:
   version-label-automation-manual:
@@ -16,4 +14,5 @@ jobs:
         id: version-label-automation-step
         uses: camunda/automation-platform-github-actions/version-label-automation-manual@Version-Labels-Automation
         with: 
-          issue: ${{ github.event.inputs.issue }}
+          issue-number: ${{ github.event.issue.number }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
