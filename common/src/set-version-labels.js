@@ -201,6 +201,11 @@ module.exports = async function () {
         return commentText;
     }
 
+    const getNoLabelCommentText = () => {
+        return "### Set Version Labels Action \n" + 
+        "Neither valid potential nor valid version label found. Please check if this is intentional.";
+    }
+
     const repoToken = core.getInput('repo-token');
     const octokit = github.getOctokit(repoToken);
     const repo = github.context.payload.repository;
@@ -215,7 +220,15 @@ module.exports = async function () {
     const potentialLabels = await getLabelsMatchingRegexp(owner, repoName, issueNumber, potentialLabelsWithNonZeroPatchVersionRegex);
 
     if (!potentialLabels.length) {
-        console.log("No `potential:` label found. Exiting.");
+        const versionLabelsRegex = `version:\\d+\\.\\d+\\.\\d+`;
+        const validVersionLabels = await getLabelsMatchingRegexp(owner, repoName, issueNumber, versionLabelsRegex);
+
+        if(validVersionLabels.length === 0) {
+            await postGithubComment(owner, repoName, issueNumber, getNoLabelCommentText());
+            console.log("Neither `potential:` nor `version:` label found. Exiting.");
+        } else {
+            console.log("No `potential:` label found. Exiting.");
+        }
         return;
     }
 
