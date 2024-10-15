@@ -113,18 +113,6 @@ module.exports = async function () {
         }
     }
 
-    const getLatestMinorVersion = async function() {
-        const url = `https://github.com/camunda/camunda-bpm-platform/raw/refs/heads/master/pom.xml`;
-        const response = await fetch(url);
-        const pomXml = await response.text();
-
-        const versionTagRegex = /<artifactId>camunda-root<\/artifactId>\s*<version>(\d+\.\d+)(?:\.\d+.*)?<\/version>/
-        const match = pomXml.match(versionTagRegex);
-
-        // Return the version if found, otherwise return null
-        return match ? match[1] : null;
-    }
-
     async function fetchDownloadPage() {
         const url = `https://docs.camunda.org/enterprise/download/`;
     
@@ -186,10 +174,9 @@ module.exports = async function () {
 
     const downloadPage = await fetchDownloadPage();
 
-    const latestVersion = await getLatestMinorVersion();
-    console.log(`Latest minor version: ${latestVersion}`);
-
     const potentialToVersionLabelsMap = await getVersionLabels(potentialLabels);
+
+    console.log(`Potential to Version Labels Map:`, potentialToVersionLabelsMap);
 
     // only potential labels that have a version label will be removed
     const potentialLabelsToRemove = Object.entries(potentialToVersionLabelsMap)
