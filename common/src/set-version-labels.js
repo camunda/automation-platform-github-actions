@@ -13,10 +13,10 @@ module.exports = async function () {
 
             if (latestPatchVersion == null) {
                 console.log(`No patch version was found in downloads page for potentialLabel: ${potentialLabel}. Returning entry with null version.`);
-                return [ potentialLabel, null ];
+                return [potentialLabel, null];
             }
 
-            return [ potentialLabel, getNextPatchVersion(latestPatchVersion) ];
+            return [potentialLabel, getNextPatchVersion(latestPatchVersion)];
         });
 
         return Object.fromEntries(results);
@@ -90,7 +90,7 @@ module.exports = async function () {
 
             const patchVersionRegex = new RegExp(`(camDownloads\\.branches\\['${minorVersion}'\\]\\s*=\\s*)(\\[[\\s\\S]*?\\])(\\s*;)`);
             const matchJson = downloadPage.match(patchVersionRegex);
-        
+
             // Return the version if found, otherwise return null
             let versionsJsonString = matchJson ? matchJson[2] : null;
 
@@ -115,21 +115,21 @@ module.exports = async function () {
 
     async function fetchDownloadPage() {
         const url = `https://docs.camunda.org/enterprise/download/`;
-    
+
         return new Promise((resolve, reject) => {
             https.get(url, (response) => {
                 let data = '';
-    
+
                 if (response.statusCode !== 200) {
                     reject(new Error(`Failed to fetch data. Status code: ${response.statusCode}`));
                     response.resume(); // Consume response data to free up memory
                     return;
                 }
-    
+
                 response.on('data', (chunk) => {
                     data += chunk;
                 });
-    
+
                 response.on('end', () => {
                     resolve(data);
                 });
@@ -152,6 +152,53 @@ module.exports = async function () {
         } catch (error) {
             console.error('Error setting labels:', error);
         }
+    }
+
+    const postGithubComment = async (owner, repo, issueNumber, comment) => {
+        octokit.rest.issues.createComment({
+            owner,
+            repo,
+            issue_number: issueNumber,
+            body: comment,
+        });
+    }
+
+    const getCommentText = (potentialToVersionLabelsMap) => {
+        let commentText = "### Set Version Labels Action \n";
+        const potentialLabelsNotMatched = Object.entries(potentialToVersionLabelsMap)
+            .filter(([_, versionLabel]) => versionLabel === null)
+            .map(([potentialLabel, _]) => potentialLabel);
+
+        const patchVersionMissMatch = Object.entries(potentialToVersionLabelsMap)
+            .filter(([potentialLabel, versionLabel]) => {
+                    return versionLabel !== null && potentialLabel.replace('potential:') !== versionLabel.replace('version:')
+                }
+            );
+    
+        if(potentialLabelsNotMatched.length === 0 && patchVersionMissMatch.length === 0) {
+            return null
+        }
+
+        if(potentialLabelsNotMatched.length) {
+            commentText += (
+                "#### Potential Labels with Non-Existing Minor: \n - " +
+                potentialLabelsNotMatched.join("\n - ") + 
+                "\n"
+            );
+        }
+
+        if(patchVersionMissMatch.length) {
+            commentText += (
+                "#### Patch Version Mismatch: \n" +
+                "|Potential Label| Version Label | \n" + 
+                "|---|---| \n" +
+                patchVersionMissMatch
+                    .map(([potentialLabel, versionLabel]) => `|${potentialLabel}|${versionLabel}|`)
+                    .join("\n")
+            );
+        }
+
+        return commentText;
     }
 
     const repoToken = core.getInput('repo-token');
@@ -186,15 +233,22 @@ module.exports = async function () {
         .map(([_, versionLabel]) => versionLabel);
 
     if (potentialLabelsToRemove.length === 0) {
-        console.log("No potential labels to set / remove, exiting.");
-        return;
+        console.log("No potential labels to set / remove.");
+    } else {
+        const uniqueVersionLabelsToAssign = [...new Set(versionLabelsToAssign)];
+
+        console.log(`Potential Version to Remove: `, potentialLabelsToRemove);
+        console.log(`Unique Version Labels to Assign: `, uniqueVersionLabelsToAssign);
+
+        await setLabels(owner, repoName, issueNumber, uniqueVersionLabelsToAssign);
+        await removeLabels(owner, repoName, issueNumber, potentialLabelsToRemove);
     }
 
-    const uniqueVersionLabelsToAssign = [...new Set(versionLabelsToAssign)];
 
-    console.log(`Potential Version to Remove: `, potentialLabelsToRemove);
-    console.log(`Unique Version Labels to Assign: `, uniqueVersionLabelsToAssign);
+    const commentText = getCommentText(potentialToVersionLabelsMap);
 
-    await setLabels(owner, repoName, issueNumber, uniqueVersionLabelsToAssign);
-    await removeLabels(owner, repoName, issueNumber, potentialLabelsToRemove);
+    if(commentText) {
+        console.log("Adding comment");
+        await postGithubComment(owner, repoName, issueNumber, commentText);
+    }
 }
