@@ -180,7 +180,7 @@ module.exports = async function () {
 
     console.log(`read repo information repoName: ${repoName} - : owner: ${owner}`);
 
-    const expression = `potential:\\d+\\.\\d+\\.\\d+`
+    const expression = `potential:\\d+\\.\\d+\\.(?!0)\\d+`
     const potentialLabels = await getLabelsMatchingRegexp(owner, repoName, issueNumber, expression);
 
     if (!potentialLabels.length) {
