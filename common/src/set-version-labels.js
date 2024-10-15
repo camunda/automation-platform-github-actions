@@ -192,13 +192,18 @@ module.exports = async function () {
     const potentialToVersionLabelsMap = await getVersionLabels(potentialLabels);
 
     // only potential labels that have a version label will be removed
-    const potentialLabelsToRemove = potentialToVersionLabelsMap
+    const potentialLabelsToRemove = Object.entries(potentialToVersionLabelsMap)
         .filter(([_, versionLabel]) => versionLabel !== null)
         .map(([potentialLabel, _]) => potentialLabel);
 
-    const versionLabelsToAssign = potentialToVersionLabelsMap
+    const versionLabelsToAssign = Object.entries(potentialToVersionLabelsMap)
         .filter(([_, versionLabel]) => versionLabel !== null)
         .map(([_, versionLabel]) => versionLabel);
+
+    if (potentialLabelsToRemove.length === 0) {
+        console.log("No potential labels to set / remove, exiting.");
+        return;
+    }
 
     const uniqueVersionLabelsToAssign = [...new Set(versionLabelsToAssign)];
 
