@@ -4,26 +4,22 @@ const https = require('https');
 
 module.exports = async function () {
 
-    // Get Version Labels
-
+    // Returns Map with [potentialLabel - versionLabel entries]
     const getVersionLabels = async function (potentialLabels) {
-        const promises = potentialLabels.map(async potentialLabel => {
-
-            if (potentialLabel.split('.')[2] === '0') { // For potential versions that are not patch
-                console.log(`label ${potentialLabel} is not a patch version, filtering it out.`);
-                return null;
-            }
-
+        const results = potentialLabels.map(potentialLabel => {
             // For maintenance versions, find the latest patch from repo
-            const latestPatchVersion = await getLatestPatchVersion(potentialLabel);
+            const latestPatchVersion = getLatestPatchVersion(potentialLabel);
             console.log(`${potentialLabel} => has Latest Patch Version: ${latestPatchVersion}`);
 
-            return getNextPatchVersion(latestPatchVersion);
+            if (latestPatchVersion == null) {
+                console.log(`No patch version was found in downloads page for potentialLabel: ${potentialLabel}. Returning entry with null version.`);
+                return [ potentialLabel, null ];
+            }
+
+            return [ potentialLabel, getNextPatchVersion(latestPatchVersion) ];
         });
 
-        // Wait for all promises to settle and filter out null values
-        const results = await Promise.all(promises);
-        return results.filter(label => label !== null);
+        return new Map(results);
     };
 
     const removeLabels = async function (owner, repo, issueNumber, labels) {
@@ -80,7 +76,7 @@ module.exports = async function () {
         return versionParts.join('.');
     }
 
-    const getLatestPatchVersion = async function (potentialLabel) {
+    const getLatestPatchVersion = function (potentialLabel) {
         console.log(`Get latest patch version for issue: #${issueNumber} for potential label:`, potentialLabel);
         try {
             const minorVersion = getMinorFromPotentialLabel(potentialLabel);
@@ -180,8 +176,8 @@ module.exports = async function () {
 
     console.log(`read repo information repoName: ${repoName} - : owner: ${owner}`);
 
-    const expression = `potential:\\d+\\.\\d+\\.(?!0)\\d+`
-    const potentialLabels = await getLabelsMatchingRegexp(owner, repoName, issueNumber, expression);
+    const potentialLabelsWithNonZeroPatchVersionRegex = `potential:\\d+\\.\\d+\\.(?!0)\\d+`;
+    const potentialLabels = await getLabelsMatchingRegexp(owner, repoName, issueNumber, potentialLabelsWithNonZeroPatchVersionRegex);
 
     if (!potentialLabels.length) {
         console.log("no `potential:` label found, exiting.");
@@ -193,9 +189,19 @@ module.exports = async function () {
     const latestVersion = await getLatestMinorVersion();
     console.log(`Latest minor version: ${latestVersion}`);
 
-    const versionLabels = await getVersionLabels(potentialLabels);
-    const uniqueVersionLabels = [...new Set(versionLabels)];
+    const potentialToVersionLabelsMap = await getVersionLabels(potentialLabels);
 
-    await setLabels(owner, repoName, issueNumber, uniqueVersionLabels);
-    await removeLabels(owner, repoName, issueNumber, potentialLabels);
+    // only potential labels that have a version label will be removed
+    const potentialLabelsToRemove = potentialToVersionLabelsMap
+        .filter(([_, versionLabel]) => versionLabel !== null)
+        .map(([potentialLabel, _]) => potentialLabel);
+
+    const versionLabelsToAssign = potentialToVersionLabelsMap
+        .filter(([_, versionLabel]) => versionLabel !== null)
+        .map(([_, versionLabel]) => versionLabel);
+
+    const uniqueVersionLabelsToAssign = [...new Set(versionLabelsToAssign)];
+
+    await setLabels(owner, repoName, issueNumber, uniqueVersionLabelsToAssign);
+    await removeLabels(owner, repoName, issueNumber, potentialLabelsToRemove);
 }
