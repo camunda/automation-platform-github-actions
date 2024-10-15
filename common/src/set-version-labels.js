@@ -40,7 +40,7 @@ module.exports = async function () {
     }
 
     const getLabelsMatchingRegexp = async function (owner, repo, issueNumber, expression) {
-        console.log(`Get labels for issue: #${issueNumber} that match expression: ${expression}`);
+        console.debug(`Get labels for issue: #${issueNumber} that match expression: ${expression}`);
         try {
             // Get issue details, which includes labels
             const { data: issue } = await octokit.rest.issues.get({
@@ -56,7 +56,7 @@ module.exports = async function () {
                 .map(label => label.name)
                 .filter(label => regexp.test(label));
 
-            console.log(`Labels matching "${expression}":`, matchingLabels);
+            console.debug(`Labels matching "${expression}":`, matchingLabels);
             return matchingLabels;
         } catch (error) {
             console.error('Error fetching issue labels:', error);
@@ -77,12 +77,12 @@ module.exports = async function () {
     }
 
     const getLatestPatchVersion = function (potentialLabel) {
-        console.log(`Get latest patch version for issue: #${issueNumber} for potential label:`, potentialLabel);
+        console.debug(`Get latest patch version for issue: #${issueNumber} for potential label:`, potentialLabel);
         try {
             const minorVersion = getMinorFromPotentialLabel(potentialLabel);
 
             if (!minorVersion) {
-                console.log(`No minor version found in the potential label`);
+                console.log(`No Minor version found in the potential label. Returning null.`);
                 return null;
             } else {
                 console.log(`Minor version found: ${minorVersion}`);
@@ -95,20 +95,20 @@ module.exports = async function () {
             let versionsJsonString = matchJson ? matchJson[2] : null;
 
             if (versionsJsonString == null) {
-                console.log(`No patch version could be extracted for potential label: ${potentialLabel}. Returning null.`);
+                console.warn(`No patch version could be extracted for potential label: ${potentialLabel}. Returning null.`);
                 return null;
             }
 
-            console.log(`Patch Versions to fetch first element:`, versionsJsonString);
+            console.debug(`Patch Versions to fetch first element:`, versionsJsonString);
 
             const extractFirstPatchVersionFromJson = new RegExp(`(number\\: ')(.*)('\\,)`);
             const matchFirstPatch = versionsJsonString.match(extractFirstPatchVersionFromJson);
             let firstPatchVersion = matchFirstPatch ? matchFirstPatch[2] : null;
 
-            console.log(`The latest version is: ${firstPatchVersion}`);
+            console.debug(`The latest Patch version is: ${firstPatchVersion}`);
             return `version:` + firstPatchVersion;
         } catch (error) {
-            console.error("Error fetching the XML document:", error);
+            console.error("Error while calculating Patch version:", error);
             return null;
         }
     }
@@ -162,21 +162,19 @@ module.exports = async function () {
 
     const issueNumber = core.getInput('issue-number');
 
-    console.log(`read repo information repoName: ${repoName} - : owner: ${owner}`);
+    console.log(`Repository Name: ${repoName}, Owner: ${owner}`);
 
     const potentialLabelsWithNonZeroPatchVersionRegex = `potential:\\d+\\.\\d+\\.(?!0)\\d+`;
     const potentialLabels = await getLabelsMatchingRegexp(owner, repoName, issueNumber, potentialLabelsWithNonZeroPatchVersionRegex);
 
     if (!potentialLabels.length) {
-        console.log("no `potential:` label found, exiting.");
+        console.log("No `potential:` label found. Exiting.");
         return;
     }
 
     const downloadPage = await fetchDownloadPage();
 
     const potentialToVersionLabelsMap = await getVersionLabels(potentialLabels);
-
-    console.log(`Potential to Version Labels Map:`, potentialToVersionLabelsMap);
 
     // only potential labels that have a version label will be removed
     const potentialLabelsToRemove = Object.entries(potentialToVersionLabelsMap)
@@ -187,21 +185,15 @@ module.exports = async function () {
         .filter(([_, versionLabel]) => versionLabel !== null)
         .map(([_, versionLabel]) => versionLabel);
 
-    console.log(`Potential Labels to Remove:`, potentialLabelsToRemove);
-    console.log({versionLabelsToAssign})
-
-    console.log(`Result of Object.entries: `, Object.entries(potentialToVersionLabelsMap))
-
-    console.log(`Result of filter: `, Object.entries(potentialToVersionLabelsMap)
-        .filter(([_, versionLabel]) => versionLabel !== null))
-
-
     if (potentialLabelsToRemove.length === 0) {
         console.log("No potential labels to set / remove, exiting.");
         return;
     }
 
     const uniqueVersionLabelsToAssign = [...new Set(versionLabelsToAssign)];
+
+    console.log(`Potential Version to Remove: `, potentialLabelsToRemove);
+    console.log(`Unique Version Labels to Assign: `, uniqueVersionLabelsToAssign);
 
     await setLabels(owner, repoName, issueNumber, uniqueVersionLabelsToAssign);
     await removeLabels(owner, repoName, issueNumber, potentialLabelsToRemove);
