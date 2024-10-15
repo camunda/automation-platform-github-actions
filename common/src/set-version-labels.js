@@ -19,7 +19,7 @@ module.exports = async function () {
             return [ potentialLabel, getNextPatchVersion(latestPatchVersion) ];
         });
 
-        return new Map(results);
+        return Object.fromEntries(results);
     };
 
     const removeLabels = async function (owner, repo, issueNumber, labels) {
@@ -186,6 +186,15 @@ module.exports = async function () {
     const versionLabelsToAssign = Object.entries(potentialToVersionLabelsMap)
         .filter(([_, versionLabel]) => versionLabel !== null)
         .map(([_, versionLabel]) => versionLabel);
+
+    console.log(`Potential Labels to Remove:`, potentialLabelsToRemove);
+    console.log({versionLabelsToAssign})
+
+    console.log(`Result of Object.entries: `, Object.entries(potentialToVersionLabelsMap))
+
+    console.log(`Result of filter: `, Object.entries(potentialToVersionLabelsMap)
+        .filter(([_, versionLabel]) => versionLabel !== null))
+
 
     if (potentialLabelsToRemove.length === 0) {
         console.log("No potential labels to set / remove, exiting.");
