@@ -1,19 +1,11 @@
-name: Label issues
-on:
-  issues:
-    types:
-      - closed
-jobs:
-  label_issues:
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-    steps:
-      - name: Run test
-        if: github.ref == 'refs/heads/Version-Labels-Automation'
-        run: gh issue edit "$NUMBER" --add-label "$LABELS"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-          NUMBER: ${{ github.event.issue.number }}
-          LABELS: "Hello World"
+name: Label Issues
+inputs:
+  issue-number:
+    description: 'Number of the issue'
+    required: true
+  repo-token:
+    description: 'Github access token'
+    required: true
+runs:
+  using: 'node16'
+  main: 'index.js'

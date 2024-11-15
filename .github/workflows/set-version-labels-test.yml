@@ -8,13 +8,13 @@ on:
         required: true
 
 jobs:
-  version-label-automation-manual:
+  version-label-automation:
     runs-on: ubuntu-latest
     name: version-label-automation
     steps:
       - name: version-label-automation-step
         id: version-label-automation-step
-        uses: camunda/automation-platform-github-actions/version-label-automation-manual@Version-Labels-Automation
+        uses: camunda/automation-platform-github-actions/version-label-automation@Version-Labels-Automation
         with: 
           issue-number: ${{ github.event.inputs.issue }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
