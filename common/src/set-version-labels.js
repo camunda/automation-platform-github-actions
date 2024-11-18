@@ -5,7 +5,7 @@ const https = require('https');
 module.exports = async function () {
 
     // Returns Map with [potentialLabel - versionLabel entries]
-    const getVersionLabels = async function (potentialLabels) {
+    const getVersionLabelsMap = async function (potentialLabels) {
         const results = potentialLabels.map(potentialLabel => {
             // For maintenance versions, find the latest patch from repo
             const latestPatchVersion = getLatestPatchVersion(potentialLabel);
@@ -206,6 +206,43 @@ module.exports = async function () {
         "Neither valid potential nor valid version label found. Please check if this is intentional.";
     }
 
+    async function hasNoPotentialNorVersionLabels(potentialLabels) {
+        const hasPotentialLabels = (potentialLabels.length > 0);
+
+        if (hasPotentialLabels) {
+            return false;
+        }
+
+        const versionLabelsRegex = `version:\\d+\\.\\d+\\.\\d+`;
+        const validVersionLabels = await getLabelsMatchingRegexp(owner, repoName, issueNumber, versionLabelsRegex);
+
+        return (validVersionLabels.length === 0);
+    }
+
+    async function removePotentialAndSetVersionLabels(nonNullVersionLabelsEntries) {
+        const potentialLabelsToRemove = nonNullVersionLabelsEntries.map(([potentialLabel, _]) => potentialLabel);
+        const versionLabelsToAssign = nonNullVersionLabelsEntries.map(([_, versionLabel]) => versionLabel);
+
+        if (potentialLabelsToRemove.length === 0) {
+            console.log("No potential labels to set / remove.");
+            return;
+        }
+
+        const uniqueVersionLabelsToAssign = [...new Set(versionLabelsToAssign)];
+
+        console.log(`Potential Version to Remove: `, potentialLabelsToRemove);
+        console.log(`Unique Version Labels to Assign: `, uniqueVersionLabelsToAssign);
+
+        await setLabels(owner, repoName, issueNumber, uniqueVersionLabelsToAssign);
+        await removeLabels(owner, repoName, issueNumber, potentialLabelsToRemove);
+    }
+
+    function hasPotentialLabels(potentialLabels) {
+        return potentialLabels.length > 0
+    }
+
+    // setup
+
     const repoToken = core.getInput('repo-token');
     const octokit = github.getOctokit(repoToken);
     const repo = github.context.payload.repository;
@@ -219,46 +256,34 @@ module.exports = async function () {
     const potentialLabelsWithNonZeroPatchVersionRegex = `potential:\\d+\\.\\d+\\.(?!0)\\d+`;
     const potentialLabels = await getLabelsMatchingRegexp(owner, repoName, issueNumber, potentialLabelsWithNonZeroPatchVersionRegex);
 
-    if (!potentialLabels.length) {
-        const versionLabelsRegex = `version:\\d+\\.\\d+\\.\\d+`;
-        const validVersionLabels = await getLabelsMatchingRegexp(owner, repoName, issueNumber, versionLabelsRegex);
+    // validate
 
-        if(validVersionLabels.length === 0) {
-            await postGithubComment(owner, repoName, issueNumber, getNoLabelCommentText());
-            console.log("Neither `potential:` nor `version:` label found. Exiting.");
-        } else {
-            console.log("No `potential:` label found. Exiting.");
-        }
+    if (await hasNoPotentialNorVersionLabels(potentialLabels)) {
+        await postGithubComment(owner, repoName, issueNumber, getNoLabelCommentText());
+        console.log("Neither `potential:` nor `version:` label found. Exiting.");
         return;
     }
 
-    const downloadPage = await fetchDownloadPage();
-
-    const potentialToVersionLabelsMap = await getVersionLabels(potentialLabels);
-
-    // only potential labels that have a version label will be removed
-    const potentialLabelsToRemove = Object.entries(potentialToVersionLabelsMap)
-        .filter(([_, versionLabel]) => versionLabel !== null)
-        .map(([potentialLabel, _]) => potentialLabel);
-
-    const versionLabelsToAssign = Object.entries(potentialToVersionLabelsMap)
-        .filter(([_, versionLabel]) => versionLabel !== null)
-        .map(([_, versionLabel]) => versionLabel);
-
-    if (potentialLabelsToRemove.length === 0) {
-        console.log("No potential labels to set / remove.");
-    } else {
-        const uniqueVersionLabelsToAssign = [...new Set(versionLabelsToAssign)];
-
-        console.log(`Potential Version to Remove: `, potentialLabelsToRemove);
-        console.log(`Unique Version Labels to Assign: `, uniqueVersionLabelsToAssign);
-
-        await setLabels(owner, repoName, issueNumber, uniqueVersionLabelsToAssign);
-        await removeLabels(owner, repoName, issueNumber, potentialLabelsToRemove);
+    if (!hasPotentialLabels(potentialLabels)) {
+        console.log("No potential labels found. Exiting.");
+        return;
     }
 
+    // fetch
 
-    const commentText = getCommentText(potentialToVersionLabelsMap);
+    const downloadPage = await fetchDownloadPage();
+
+    const versionLabelsMap = await getVersionLabelsMap(potentialLabels);
+
+    // only potential labels that have a version label will be removed
+    const nonNullVersionLabelsEntries = Object.entries(versionLabelsMap)
+        .filter(([_, versionLabel]) => versionLabel !== null)
+
+    // update
+
+    await removePotentialAndSetVersionLabels(nonNullVersionLabelsEntries);
+
+    const commentText = getCommentText(versionLabelsMap);
 
     if(commentText) {
         console.log("Adding comment");
