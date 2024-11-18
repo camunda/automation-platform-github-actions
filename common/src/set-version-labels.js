@@ -4,6 +4,12 @@ const https = require('https');
 
 module.exports = async function () {
 
+    async function getPotentialLabels() {
+        const potentialLabelsWithNonZeroPatchVersionRegex = `potential:\\d+\\.\\d+\\.(?!0)\\d+`;
+
+        return await getLabelsMatchingRegexp(owner, repoName, issueNumber, potentialLabelsWithNonZeroPatchVersionRegex);
+    }
+
     // Returns Map with [potentialLabel - versionLabel entries]
     const getVersionLabelsMap = async function (potentialLabels) {
         const results = potentialLabels.map(potentialLabel => {
@@ -253,8 +259,7 @@ module.exports = async function () {
 
     console.log(`Repository Name: ${repoName}, Owner: ${owner}`);
 
-    const potentialLabelsWithNonZeroPatchVersionRegex = `potential:\\d+\\.\\d+\\.(?!0)\\d+`;
-    const potentialLabels = await getLabelsMatchingRegexp(owner, repoName, issueNumber, potentialLabelsWithNonZeroPatchVersionRegex);
+    const potentialLabels = await getPotentialLabels();
 
     // validate
 
