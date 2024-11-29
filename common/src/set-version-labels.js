@@ -11,11 +11,11 @@ module.exports = async function () {
 
     // Returns Map with [potentialLabel - versionLabel entries]
     const getVersionLabelsMap = async (potentialLabels, downloadPage) => {
-        const latestVersion = await getLatestVersion();
+        const nextMinorVersion = await getNextMinorVersion();
         const results = potentialLabels.map(potentialLabel => {
-            if (isNextReleaseVersion(potentialLabel, latestVersion)) {
-                const versionLabel = getVersionLabel(potentialLabel)
-                return [potentialLabel, versionLabel];
+            if (isNextMinorReleaseVersion(potentialLabel, nextMinorVersion)) {
+                const nextMinorVersionLabel = `version:${nextMinorVersion}.0`;
+                return [potentialLabel, nextMinorVersionLabel];
             }
 
             // For maintenance versions, find the latest patch from repo
@@ -122,18 +122,18 @@ module.exports = async function () {
         }
     }
 
-    const getLatestVersion = async function() {
+    const getNextMinorVersion = async function() {
         const url = `https://github.com/camunda/camunda-bpm-platform/raw/refs/heads/master/pom.xml`;
         const response = await fetch(url);
         const pomXml = await response.text();
-        const versionTagRegex = /<artifactId>camunda-root<\/artifactId>\s*<version>(\d+\.\d+\.\d+)(?:-.*)?<\/version>/
+        const versionTagRegex = /<artifactId>camunda-root<\/artifactId>\s*<version>(\d+\.\d+)(?:\.\d+.*)?<\/version>/
         const match = pomXml.match(versionTagRegex);
         // Return the version if found, otherwise return null
-        return match ? `version:${match[1]}` : null;
+        return match ? `${match[1]}` : null;
     }
 
-    const isNextReleaseVersion = function (potentialLabel, latestVersion) {
-        return (getVersionLabel(potentialLabel) === latestVersion);
+    const isNextMinorReleaseVersion = function (potentialLabel, nextMinorVersion) {
+        return getMinorFromPotentialLabel(potentialLabel) === nextMinorVersion
     }
 
     async function fetchDownloadPage() {
