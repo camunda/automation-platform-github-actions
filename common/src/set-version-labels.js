@@ -10,10 +10,10 @@ module.exports = async function () {
     }
 
     // Returns Map with [potentialLabel - versionLabel entries]
-    const getVersionLabelsMap = async (potentialLabels) => {
+    const getVersionLabelsMap = async (potentialLabels, downloadPage) => {
         const results = potentialLabels.map(potentialLabel => {
             // For maintenance versions, find the latest patch from repo
-            const latestPatchVersion = getLatestPatchVersion(potentialLabel);
+            const latestPatchVersion = getLatestPatchVersion(potentialLabel, downloadPage);
             console.log(`${potentialLabel} => has Latest Patch Version: ${latestPatchVersion}`);
 
             if (latestPatchVersion == null) {
@@ -75,7 +75,7 @@ module.exports = async function () {
         return versionParts.join('.');
     }
 
-    const getLatestPatchVersion = function (potentialLabel) {
+    const getLatestPatchVersion = function (potentialLabel, downloadPage) {
         console.debug(`Get latest patch version for issue: #${issueNumber} for potential label:`, potentialLabel);
         try {
             const minorVersion = getMinorFromPotentialLabel(potentialLabel);
@@ -271,7 +271,7 @@ module.exports = async function () {
 
     const downloadPage = await fetchDownloadPage();
 
-    const versionLabelsMap = await getVersionLabelsMap(potentialLabels);
+    const versionLabelsMap = await getVersionLabelsMap(potentialLabels, downloadPage);
 
     // only potential labels that have a version label will be removed
     const nonNullVersionLabelsEntries = Object.entries(versionLabelsMap)
