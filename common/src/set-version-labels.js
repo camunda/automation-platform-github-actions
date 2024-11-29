@@ -12,6 +12,11 @@ module.exports = async function () {
     // Returns Map with [potentialLabel - versionLabel entries]
     const getVersionLabelsMap = async (potentialLabels, downloadPage) => {
         const results = potentialLabels.map(potentialLabel => {
+
+            if (isNextReleaseVersion(potentialLabel)) {
+                return getVersionLabel(potentialLabel);
+            }
+
             // For maintenance versions, find the latest patch from repo
             const latestPatchVersion = getLatestPatchVersion(potentialLabel, downloadPage);
             console.log(`${potentialLabel} => has Latest Patch Version: ${latestPatchVersion}`);
@@ -69,6 +74,10 @@ module.exports = async function () {
         return match ? match[1] : null;
     }
 
+    const getVersionLabel = function (potentialLabel) {
+        return `version:` + potentialLabel.slice(`potential:`.length);
+    }
+
     const getNextPatchVersion = function (currentVersion) {
         const versionParts = currentVersion.split('.');
         versionParts[2] = parseInt(versionParts[2]) + 1;
@@ -110,6 +119,21 @@ module.exports = async function () {
             console.error("Error while calculating Patch version:", error);
             return null;
         }
+    }
+
+    const getLatestVersion = async function() {
+        const url = `https://github.com/camunda/camunda-bpm-platform/raw/refs/heads/master/pom.xml`;
+        const response = await fetch(url);
+        const pomXml = await response.text();
+        const versionTagRegex = /<artifactId>camunda-root<\/artifactId>\s*<version>(\d+\.\d+)(?:\.\d+.*)?<\/version>/
+        const match = pomXml.match(versionTagRegex);
+        // Return the version if found, otherwise return null
+        return match ? match[1] : null;
+    }
+
+    const isNextReleaseVersion = async function (potentialLabel) {
+        const latestVersion = await getLatestVersion();
+        return (potentialLabel === latestVersion);
     }
 
     async function fetchDownloadPage() {
