@@ -5,8 +5,8 @@ const https = require('https');
 module.exports = async function () {
 
     const getPotentialLabels = async (ticketMetadata) => {
-        const potentialLabelsWithNonZeroPatchVersionRegex = `potential:\\d+\\.\\d+\\.(?!0)\\d+`;
-        return getLabelsMatchingRegexp(ticketMetadata, potentialLabelsWithNonZeroPatchVersionRegex);
+        const validPotentialLabelRegex = `potential:\\d+\\.\\d+\\.\\d+`;
+        return getLabelsMatchingRegexp(ticketMetadata, validPotentialLabelRegex);
     }
 
     // Returns Map with [potentialLabel - versionLabel entries]
