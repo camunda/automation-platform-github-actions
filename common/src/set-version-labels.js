@@ -12,9 +12,9 @@ module.exports = async function () {
     // Returns Map with [potentialLabel - versionLabel entries]
     const getVersionLabelsMap = async (potentialLabels, downloadPage) => {
         const results = potentialLabels.map(potentialLabel => {
-
             if (isNextReleaseVersion(potentialLabel)) {
-                return getVersionLabel(potentialLabel);
+                const versionLabel = getVersionLabel(potentialLabel)
+                return [potentialLabel, versionLabel];
             }
 
             // For maintenance versions, find the latest patch from repo
@@ -133,7 +133,8 @@ module.exports = async function () {
 
     const isNextReleaseVersion = async function (potentialLabel) {
         const latestVersion = await getLatestVersion();
-        return (potentialLabel === latestVersion);
+
+        return (getVersionLabel(potentialLabel) === latestVersion);
     }
 
     async function fetchDownloadPage() {
