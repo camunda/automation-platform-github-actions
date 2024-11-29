@@ -28,13 +28,13 @@ module.exports = async function () {
         return Object.fromEntries(results);
     };
 
-    const removeLabels = async function (owner, repo, issueNumber, labels) {
+    const removeLabels = async function (owner, repoName, issueNumber, labels) {
         console.log(`Remove labels for issue #${issueNumber}:`, labels);
         try {
             for (const label of labels) {
                 await octokit.rest.issues.removeLabel({
                     owner,
-                    repo,
+                    repo: repoName,
                     issue_number: issueNumber,
                     name: label // Use the current label in the iteration
                 });
@@ -45,13 +45,13 @@ module.exports = async function () {
         }
     }
 
-    const getLabelsMatchingRegexp = async function (owner, repo, issueNumber, expression) {
+    const getLabelsMatchingRegexp = async function (owner, repoName, issueNumber, expression) {
         console.debug(`Get labels for issue: #${issueNumber} that match expression: ${expression}`);
         try {
             // Get issue details, which includes labels
             const { data: issue } = await octokit.rest.issues.get({
                 owner,
-                repo,
+                repo: repoName,
                 issue_number: issueNumber,
             });
 
@@ -145,12 +145,12 @@ module.exports = async function () {
         });
     }
 
-    const setLabels = async function (owner, repo, issueNumber, labels) {
+    const setLabels = async function (owner, repoName, issueNumber, labels) {
         console.log(`Set labels for issue: #${issueNumber}:`, labels);
         try {
             await octokit.rest.issues.addLabels({
                 owner,
-                repo,
+                repo: repoName,
                 issue_number: issueNumber,
                 labels: labels
             });
@@ -160,10 +160,10 @@ module.exports = async function () {
         }
     }
 
-    const postGithubComment = async (owner, repo, issueNumber, comment) => {
+    const postGithubComment = async (owner, repoName, issueNumber, comment) => {
         octokit.rest.issues.createComment({
             owner,
-            repo,
+            repo: repoName,
             issue_number: issueNumber,
             body: comment,
         });
@@ -212,7 +212,7 @@ module.exports = async function () {
         "Neither valid potential nor valid version label found. Please check if this is intentional.";
     }
 
-    async function hasNoPotentialNorVersionLabels(potentialLabels) {
+    const hasNoPotentialNorVersionLabels = async (potentialLabels) => {
         const hasPotentialLabels = (potentialLabels.length > 0);
 
         if (hasPotentialLabels) {
@@ -225,7 +225,7 @@ module.exports = async function () {
         return (validVersionLabels.length === 0);
     }
 
-    async function removePotentialAndSetVersionLabels(nonNullVersionLabelsEntries) {
+    const removePotentialAndSetVersionLabels = async (nonNullVersionLabelsEntries) => {
         const potentialLabelsToRemove = nonNullVersionLabelsEntries.map(([potentialLabel, _]) => potentialLabel);
         const versionLabelsToAssign = nonNullVersionLabelsEntries.map(([_, versionLabel]) => versionLabel);
 
@@ -243,19 +243,17 @@ module.exports = async function () {
         await removeLabels(owner, repoName, issueNumber, potentialLabelsToRemove);
     }
 
-    function hasPotentialLabels(potentialLabels) {
+    const hasPotentialLabels = (potentialLabels) => {
         return potentialLabels.length > 0
     }
 
     // setup
 
+    const issueNumber = core.getInput('issue-number');
     const repoToken = core.getInput('repo-token');
     const octokit = github.getOctokit(repoToken);
-    const repo = github.context.payload.repository;
-    const repoName = repo.name;
-    const owner = repo.owner.login;
 
-    const issueNumber = core.getInput('issue-number');
+    const { name: repoName, owner: { login: owner } } = github.context.payload.repository;
 
     console.log(`Repository Name: ${repoName}, Owner: ${owner}`);
 
