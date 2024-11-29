@@ -2,12 +2,12 @@ const core = require('@actions/core');
 const github = require('@actions/github');
 const https = require('https');
 
-const potentialLabelsWithNonZeroPatchVersionRegex = `potential:\\d+\\.\\d+\\.(?!0)\\d+`;
-
 module.exports = async function () {
 
-    const getPotentialLabels = async (ticketMetadata) =>
-         getLabelsMatchingRegexp(ticketMetadata, potentialLabelsWithNonZeroPatchVersionRegex);
+    const getPotentialLabels = async (ticketMetadata) => {
+        const potentialLabelsWithNonZeroPatchVersionRegex = `potential:\\d+\\.\\d+\\.(?!0)\\d+`;
+        return getLabelsMatchingRegexp(ticketMetadata, potentialLabelsWithNonZeroPatchVersionRegex);
+    }
 
     // Returns Map with [potentialLabel - versionLabel entries]
     const getVersionLabelsMap = async (potentialLabels) => {
