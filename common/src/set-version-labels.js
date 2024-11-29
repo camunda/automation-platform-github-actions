@@ -153,7 +153,7 @@ module.exports = async function () {
     }
 
     const postGithubComment = async (ticketMetadata, comment) => {
-        octokit.rest.issues.createComment({
+        await octokit.rest.issues.createComment({
             ...ticketMetadata,
             body: comment,
         });
@@ -250,14 +250,12 @@ module.exports = async function () {
         issue_number: issueNumber
     };
 
-    console.log(`Repository Name: ${repoName}, Owner: ${owner}`);
-
     const potentialLabels = await getPotentialLabels(ticketMetadata);
 
     // validate
 
     if (await hasNoPotentialNorVersionLabels(potentialLabels)) {
-        await postGithubComment(owner, repoName, issueNumber, getNoLabelCommentText());
+        await postGithubComment(ticketMetadata, getNoLabelCommentText());
         console.log("Neither `potential:` nor `version:` label found. Exiting.");
         return;
     }
@@ -285,6 +283,6 @@ module.exports = async function () {
 
     if(commentText) {
         console.log("Adding comment");
-        await postGithubComment(owner, repoName, issueNumber, commentText);
+        await postGithubComment(ticketMetadata, commentText);
     }
 }
