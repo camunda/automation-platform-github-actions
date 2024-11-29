@@ -2,16 +2,15 @@ const core = require('@actions/core');
 const github = require('@actions/github');
 const https = require('https');
 
+const potentialLabelsWithNonZeroPatchVersionRegex = `potential:\\d+\\.\\d+\\.(?!0)\\d+`;
+
 module.exports = async function () {
 
-    async function getPotentialLabels() {
-        const potentialLabelsWithNonZeroPatchVersionRegex = `potential:\\d+\\.\\d+\\.(?!0)\\d+`;
-
-        return await getLabelsMatchingRegexp(owner, repoName, issueNumber, potentialLabelsWithNonZeroPatchVersionRegex);
-    }
+    const getPotentialLabels = async (ticketMetadata) =>
+         getLabelsMatchingRegexp(ticketMetadata, potentialLabelsWithNonZeroPatchVersionRegex);
 
     // Returns Map with [potentialLabel - versionLabel entries]
-    const getVersionLabelsMap = async function (potentialLabels) {
+    const getVersionLabelsMap = async (potentialLabels) => {
         const results = potentialLabels.map(potentialLabel => {
             // For maintenance versions, find the latest patch from repo
             const latestPatchVersion = getLatestPatchVersion(potentialLabel);
@@ -28,14 +27,12 @@ module.exports = async function () {
         return Object.fromEntries(results);
     };
 
-    const removeLabels = async function (owner, repoName, issueNumber, labels) {
+    const removeLabels = async function (ticketMetadata, labels) {
         console.log(`Remove labels for issue #${issueNumber}:`, labels);
         try {
             for (const label of labels) {
                 await octokit.rest.issues.removeLabel({
-                    owner,
-                    repo: repoName,
-                    issue_number: issueNumber,
+                    ...ticketMetadata,
                     name: label // Use the current label in the iteration
                 });
                 console.log(`Label "${label}" removed from issue #${issueNumber}`);
@@ -45,15 +42,11 @@ module.exports = async function () {
         }
     }
 
-    const getLabelsMatchingRegexp = async function (owner, repoName, issueNumber, expression) {
+    const getLabelsMatchingRegexp = async function (ticketMetadata, expression) {
         console.debug(`Get labels for issue: #${issueNumber} that match expression: ${expression}`);
         try {
             // Get issue details, which includes labels
-            const { data: issue } = await octokit.rest.issues.get({
-                owner,
-                repo: repoName,
-                issue_number: issueNumber,
-            });
+            const { data: issue } = await octokit.rest.issues.get(ticketMetadata);
 
             const regexp = new RegExp(expression);
 
@@ -145,26 +138,23 @@ module.exports = async function () {
         });
     }
 
-    const setLabels = async function (owner, repoName, issueNumber, labels) {
+    const setLabels = async function (ticketMetadata, labels) {
         console.log(`Set labels for issue: #${issueNumber}:`, labels);
         try {
             await octokit.rest.issues.addLabels({
-                owner,
-                repo: repoName,
-                issue_number: issueNumber,
+                ...ticketMetadata,
                 labels: labels
             });
+
             console.log(`Labels set to issue #${issueNumber}:`, labels);
         } catch (error) {
             console.error('Error setting labels:', error);
         }
     }
 
-    const postGithubComment = async (owner, repoName, issueNumber, comment) => {
+    const postGithubComment = async (ticketMetadata, comment) => {
         octokit.rest.issues.createComment({
-            owner,
-            repo: repoName,
-            issue_number: issueNumber,
+            ...ticketMetadata,
             body: comment,
         });
     }
@@ -220,7 +210,7 @@ module.exports = async function () {
         }
 
         const versionLabelsRegex = `version:\\d+\\.\\d+\\.\\d+`;
-        const validVersionLabels = await getLabelsMatchingRegexp(owner, repoName, issueNumber, versionLabelsRegex);
+        const validVersionLabels = await getLabelsMatchingRegexp(ticketMetadata, versionLabelsRegex);
 
         return (validVersionLabels.length === 0);
     }
@@ -239,8 +229,8 @@ module.exports = async function () {
         console.log(`Potential Version to Remove: `, potentialLabelsToRemove);
         console.log(`Unique Version Labels to Assign: `, uniqueVersionLabelsToAssign);
 
-        await setLabels(owner, repoName, issueNumber, uniqueVersionLabelsToAssign);
-        await removeLabels(owner, repoName, issueNumber, potentialLabelsToRemove);
+        await setLabels(ticketMetadata, uniqueVersionLabelsToAssign);
+        await removeLabels(ticketMetadata, potentialLabelsToRemove);
     }
 
     const hasPotentialLabels = (potentialLabels) => {
@@ -253,11 +243,16 @@ module.exports = async function () {
     const repoToken = core.getInput('repo-token');
     const octokit = github.getOctokit(repoToken);
 
-    const { name: repoName, owner: { login: owner } } = github.context.payload.repository;
+    const repo = github.context.payload.repository;
+    const ticketMetadata = { 
+        repo: repo.name,
+        owner: repo.owner.login,
+        issue_number: issueNumber
+    };
 
     console.log(`Repository Name: ${repoName}, Owner: ${owner}`);
 
-    const potentialLabels = await getPotentialLabels();
+    const potentialLabels = await getPotentialLabels(ticketMetadata);
 
     // validate
 
