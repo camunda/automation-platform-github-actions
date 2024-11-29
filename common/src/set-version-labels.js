@@ -11,8 +11,9 @@ module.exports = async function () {
 
     // Returns Map with [potentialLabel - versionLabel entries]
     const getVersionLabelsMap = async (potentialLabels, downloadPage) => {
+        const latestVersion = await getLatestVersion();
         const results = potentialLabels.map(potentialLabel => {
-            if (isNextReleaseVersion(potentialLabel)) {
+            if (isNextReleaseVersion(potentialLabel, latestVersion)) {
                 const versionLabel = getVersionLabel(potentialLabel)
                 return [potentialLabel, versionLabel];
             }
@@ -131,9 +132,7 @@ module.exports = async function () {
         return match ? match[1] : null;
     }
 
-    const isNextReleaseVersion = async function (potentialLabel) {
-        const latestVersion = await getLatestVersion();
-
+    const isNextReleaseVersion = async function (potentialLabel, latestVersion) {
         return (getVersionLabel(potentialLabel) === latestVersion);
     }
 
