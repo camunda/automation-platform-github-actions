@@ -75,10 +75,6 @@ module.exports = async function () {
         return match ? match[1] : null;
     }
 
-    const getVersionLabel = function (potentialLabel) {
-        return `version:` + potentialLabel.slice(`potential:`.length);
-    }
-
     const getNextPatchVersion = function (currentVersion) {
         const versionParts = currentVersion.split('.');
         versionParts[2] = parseInt(versionParts[2]) + 1;
