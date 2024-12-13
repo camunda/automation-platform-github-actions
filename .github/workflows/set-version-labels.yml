@@ -1,9 +1,7 @@
 name: Set Version Labels
 
 on:
-  issues:
-    types:
-      - closed
+  workflow_call:
 
 jobs:
   version-label-automation:
