@@ -179,7 +179,7 @@ module.exports = async function () {
         });
     }
 
-    const getCommentText = (potentialToVersionLabelsMap) => {
+    const getWarningCommentText = (potentialToVersionLabelsMap) => {
         let commentText = "### Set Version Labels Action \n";
         const potentialLabelsNotMatched = Object.entries(potentialToVersionLabelsMap)
             .filter(([_, versionLabel]) => versionLabel === null)
@@ -222,13 +222,7 @@ module.exports = async function () {
         "Neither valid potential nor valid version label found. Please check if this is intentional.";
     }
 
-    const hasNoPotentialNorVersionLabels = async (potentialLabels) => {
-        const hasPotentialLabels = (potentialLabels.length > 0);
-
-        if (hasPotentialLabels) {
-            return false;
-        }
-
+    const hasVersionLabels = async (ticketMetadata) => {
         const versionLabelsRegex = `version:\\d+\\.\\d+\\.\\d+`;
         const validVersionLabels = await getLabelsMatchingRegexp(ticketMetadata, versionLabelsRegex);
 
@@ -274,7 +268,7 @@ module.exports = async function () {
 
     // validate
 
-    if (await hasNoPotentialNorVersionLabels(potentialLabels)) {
+    if (!hasPotentialLabels(potentialLabels) && !await hasVersionLabels(ticketMetadata)) {
         await postGithubComment(ticketMetadata, getNoLabelCommentText());
         console.log("Neither `potential:` nor `version:` label found. Exiting.");
         return;
@@ -299,7 +293,7 @@ module.exports = async function () {
 
     await removePotentialAndSetVersionLabels(nonNullVersionLabelsEntries);
 
-    const commentText = getCommentText(versionLabelsMap);
+    const commentText = getWarningCommentText(versionLabelsMap);
 
     if(commentText) {
         console.log("Adding comment");
