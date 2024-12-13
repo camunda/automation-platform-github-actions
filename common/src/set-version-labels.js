@@ -229,6 +229,12 @@ module.exports = async function () {
         return (validVersionLabels.length !== 0);
     }
 
+    const haScopeOptimizeLabel = async (ticketMetadata) => {
+        const scopeOptimizeLabel = await getLabelsMatchingRegexp(ticketMetadata, `scope:optimize`);
+
+        return (scopeOptimizeLabel.length !== 0);
+    }
+
     const removePotentialAndSetVersionLabels = async (nonNullVersionLabelsEntries) => {
         const potentialLabelsToRemove = nonNullVersionLabelsEntries.map(([potentialLabel, _]) => potentialLabel);
         const versionLabelsToAssign = nonNullVersionLabelsEntries.map(([_, versionLabel]) => versionLabel);
@@ -251,6 +257,21 @@ module.exports = async function () {
         return potentialLabels.length > 0
     }
 
+    const isUnsupportedIssue = async (ticketMetadata) => {
+        // Insert here cases that should be excluded by the action
+
+        if (await isIssueRelatedToOptimize(ticketMetadata)) {
+            console.log(`Issue is related to Optimize.`);
+            return true;
+        }
+
+        return false;
+    }
+
+    const isIssueRelatedToOptimize = async (ticketMetadata) => {
+        return await haScopeOptimizeLabel(ticketMetadata);
+    }
+
     // setup
 
     const issueNumber = core.getInput('issue-number');
@@ -263,6 +284,11 @@ module.exports = async function () {
         owner: repo.owner.login,
         issue_number: issueNumber
     };
+
+    if (await isUnsupportedIssue(ticketMetadata)) {
+        console.log(`Issue ${issueNumber} is not supported. Exiting.`);
+        return;
+    }
 
     const potentialLabels = await getPotentialLabels(ticketMetadata);
 
