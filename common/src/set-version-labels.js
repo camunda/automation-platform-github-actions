@@ -226,7 +226,7 @@ module.exports = async function () {
         const versionLabelsRegex = `version:\\d+\\.\\d+\\.\\d+`;
         const validVersionLabels = await getLabelsMatchingRegexp(ticketMetadata, versionLabelsRegex);
 
-        return (validVersionLabels.length === 0);
+        return (validVersionLabels.length !== 0);
     }
 
     const removePotentialAndSetVersionLabels = async (nonNullVersionLabelsEntries) => {
