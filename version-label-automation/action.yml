@@ -1,0 +1,11 @@
+name: Label Issues
+inputs:
+  issue-number:
+    description: 'Number of the issue'
+    required: true
+  repo-token:
+    description: 'Github access token'
+    required: true
+runs:
+  using: 'node16'
+  main: 'index.js'

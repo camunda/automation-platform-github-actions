@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: version-label-automation-step
         id: version-label-automation-step
-        uses: camunda/automation-platform-github-actions/version-label-automation@Version-Labels-Automation
+        uses: camunda/automation-platform-github-actions/version-label-automation@main
         with: 
-          issue: ${{ github.event.inputs.issue }}
+          issue-number: ${{ github.event.inputs.issue }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
