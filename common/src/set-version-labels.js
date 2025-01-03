@@ -272,6 +272,33 @@ module.exports = async function () {
         return await haScopeOptimizeLabel(ticketMetadata);
     }
 
+    async function fetchProjectsForIssue(ticketMetadata) {
+        const query = `
+          query($owner: String!, $repo: String!, $issueNumber: Int!) {
+            repository(owner: $owner, name: $repo) {
+              issue(number: $issueNumber) {
+                projectsNext {
+                  nodes {
+                    title
+                    id
+                    url
+                  }
+                }
+              }
+            }
+          }
+        `;
+      
+        try {
+          const response = await octokit.graphql(query, ticketMetadata);
+        
+          console.log("Projects associated with the issue:", response.repository.issue.projectsNext.nodes);
+          return response
+        } catch (error) {
+          console.error("Error fetching projects:", error);
+        }
+      }
+
     // setup
     const assignee = core.getInput('assignee');
     const assignees = core.getInput('assignees');
@@ -290,15 +317,11 @@ module.exports = async function () {
 
     console.log({assignee, assignees})
 
-    const issueData =  await octokit.rest.issues.get(ticketMetadata);
+    const { data: issueData } =  await octokit.rest.issues.get(ticketMetadata);
 
-    console.log({issueData})
+    console.log({issueData, assignee: JSON.stringify(issueData.assignee), assignees: JSON.stringify(issueData.assignees)})
 
-    const projects = await octokit.rest.issues.listProjects({
-        owner: repo.owner.login,
-        repo: repo.name,
-        issue_number: issueNumber,
-      });
+    const projects = await fetchProjectsForIssue(ticketMetadata);
 
 
     console.log({projects})
