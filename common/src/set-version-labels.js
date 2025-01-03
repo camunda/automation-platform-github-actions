@@ -272,8 +272,45 @@ module.exports = async function () {
         return await haScopeOptimizeLabel(ticketMetadata);
     }
 
-    // setup
+      async function fetchProjectsForIssue(ticketMetadata) {
+        console.log({ticketMetadata})
+        const query = `
+          query($owner: String!, $repo: String!, $issue_number: Int!) {
+            repository(owner: $owner, name: $repo) {
+              issue(number: $issue_number) {
+                projectCards(first: 10) {
+                  edges {
+                    node {
+                      project {
+                        name
+                        url
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        `;
+      
+        try {
+          const response = await octokit.graphql(query, ticketMetadata);
+          console.log({response})
+          const projectCards = response.repository.issue.projectCards.edges;
+          console.log("Projects associated with the issue:");
+          projectCards.forEach((card) => {
+            console.log(`- ${card.node.project.name}: ${card.node.project.url}`);
+            console.log({card})
+          });
+          return projectCards
+        } catch (error) {
+          console.error("Error fetching projects:", error);
+        }
+      }
 
+    // setup
+    const assignee = core.getInput('assignee');
+    const assignees = core.getInput('assignees');
     const issueNumber = core.getInput('issue-number');
     const repoToken = core.getInput('repo-token');
     const octokit = github.getOctokit(repoToken);
@@ -282,8 +319,22 @@ module.exports = async function () {
     const ticketMetadata = { 
         repo: repo.name,
         owner: repo.owner.login,
-        issue_number: issueNumber
+        issue_number: parseInt(issueNumber)
+        // assignee,
+        // assignees
     };
+
+    console.log({assignee, assignees})
+
+    const { data: issueData } =  await octokit.rest.issues.get(ticketMetadata);
+
+    console.log({issueData, assignee: JSON.stringify(issueData.assignee), assignees: JSON.stringify(issueData.assignees)})
+
+    const projects = await fetchProjectsForIssue(ticketMetadata);
+
+
+    console.log({projects})
+
 
     if (await isUnsupportedIssue(ticketMetadata)) {
         console.log(`Issue ${issueNumber} is not supported. Exiting.`);
