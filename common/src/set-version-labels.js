@@ -235,6 +235,12 @@ module.exports = async function () {
         return (scopeOptimizeLabel.length !== 0);
     }
 
+    const hasCommunityWorkLabel = async (ticketMetadata) => {
+        const communityWorkLabel = await getLabelsMatchingRegexp(ticketMetadata, `group:community-work`);
+
+        return (communityWorkLabel.length !== 0);
+    }
+
     const removePotentialAndSetVersionLabels = async (nonNullVersionLabelsEntries) => {
         const potentialLabelsToRemove = nonNullVersionLabelsEntries.map(([potentialLabel, _]) => potentialLabel);
         const versionLabelsToAssign = nonNullVersionLabelsEntries.map(([_, versionLabel]) => versionLabel);
@@ -265,11 +271,20 @@ module.exports = async function () {
             return true;
         }
 
+        if (await isIssueRelatedCommunityWork(ticketMetadata)) {
+            console.log(`Issue is related to Community Work.`);
+            return true;
+        }
+
         return false;
     }
 
     const isIssueRelatedToOptimize = async (ticketMetadata) => {
         return await haScopeOptimizeLabel(ticketMetadata);
+    }
+
+    const isIssueRelatedCommunityWork = async (ticketMetadata) => {
+        return await hasCommunityWorkLabel(ticketMetadata);
     }
 
     // setup
