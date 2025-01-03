@@ -273,7 +273,8 @@ module.exports = async function () {
     }
 
     // setup
-
+    const assignee = core.getInput('assignee');
+    const assignees = core.getInput('assignees');
     const issueNumber = core.getInput('issue-number');
     const repoToken = core.getInput('repo-token');
     const octokit = github.getOctokit(repoToken);
@@ -283,7 +284,25 @@ module.exports = async function () {
         repo: repo.name,
         owner: repo.owner.login,
         issue_number: issueNumber
+        // assignee,
+        // assignees
     };
+
+    console.log({assignee, assignees})
+
+    const issueData =  await octokit.rest.issues.get(ticketMetadata);
+
+    console.log({issueData})
+
+    const projects = await octokit.rest.issues.listProjects({
+        owner: repo.owner.login,
+        repo: repo.name,
+        issue_number: issueNumber,
+      });
+
+
+    console.log({projects})
+
 
     if (await isUnsupportedIssue(ticketMetadata)) {
         console.log(`Issue ${issueNumber} is not supported. Exiting.`);
