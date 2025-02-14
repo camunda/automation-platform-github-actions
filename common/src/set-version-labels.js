@@ -303,7 +303,7 @@ module.exports = async function () {
         return false;
     }
 
-    const getIssueScope = async (ticketMetadata) => {
+    const getTicketScope = async (ticketMetadata) => {
         // Insert here cases that should be excluded by the action
 
         if (await isIssueRelatedToOptimize(ticketMetadata)) {
@@ -343,15 +343,15 @@ module.exports = async function () {
         issue_number: issueNumber
     };
 
-    const issueScope = await getIssueScope(ticketMetadata);
-    console.log(`Issue scope: ${issueScope}`);
+    const ticketScope = await getTicketScope(ticketMetadata);
+    console.log(`Ticket scope: ${ticketScope}`);
 
     if (await isUnsupportedIssue(ticketMetadata)) {
         console.log(`Issue ${issueNumber} is not supported. Exiting.`);
         return;
     }
 
-    const potentialLabels = await getPotentialLabels(ticketMetadata, issueScope);
+    const potentialLabels = await getPotentialLabels(ticketMetadata);
 
     // validate
 
