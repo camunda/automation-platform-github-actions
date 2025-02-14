@@ -134,7 +134,7 @@ module.exports = async function () {
     }
 
     async function fetchDownloadPage(ticketScope) {
-        const url = `https://docs.camunda.org/enterprise/download/`;
+        const url = getDownloadPageUrl(ticketScope);
 
         return new Promise((resolve, reject) => {
             https.get(url, (response) => {
@@ -294,6 +294,20 @@ module.exports = async function () {
         }
 
         console.log("Scope not recognized. Returning null next minor version");
+        return null;
+    }
+
+    const getDownloadPageUrl = (ticketScope) => {
+
+        if (isScopeCamundaPlatform7(ticketScope)) {
+            return `https://docs.camunda.org/enterprise/download/`;
+        }
+
+        if (isScopeOptimize(ticketScope)) {
+            return `https://docs.camunda.org/enterprise/download/#camunda-optimize`; // TODO verify if it works
+        }
+
+        console.log("Scope not recognized. Returning null download page url");
         return null;
     }
 
