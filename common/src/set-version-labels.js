@@ -4,13 +4,13 @@ const https = require('https');
 
 module.exports = async function () {
 
-    const getPotentialLabels = async (ticketMetadata) => {
+    const getPotentialLabels = async (ticketMetadata, ticketScope) => {
         const validPotentialLabelRegex = `potential:\\d+\\.\\d+\\.\\d+`;
         return getLabelsMatchingRegexp(ticketMetadata, validPotentialLabelRegex);
     }
 
     // Returns Map with [potentialLabel - versionLabel entries]
-    const getVersionLabelsMap = async (potentialLabels, downloadPage) => {
+    const getVersionLabelsMap = async (potentialLabels, downloadPage, ticketScope) => {
         const nextMinorVersion = await getNextMinorVersion();
         const results = potentialLabels.map(potentialLabel => {
             if (isNextMinorReleaseVersion(potentialLabel, nextMinorVersion)) {
@@ -68,7 +68,7 @@ module.exports = async function () {
         }
     }
 
-    const getMinorFromPotentialLabel = function (potentialLabel) {
+    const getMinorFromPotentialLabel = function (potentialLabel, ticketScope) {
         const regex = /potential:(\d+\.\d+)\.\d+/;
         const match = potentialLabel.match(regex);
 
@@ -132,7 +132,7 @@ module.exports = async function () {
         return getMinorFromPotentialLabel(potentialLabel) === nextMinorVersion
     }
 
-    async function fetchDownloadPage() {
+    async function fetchDownloadPage(ticketScope) {
         const url = `https://docs.camunda.org/enterprise/download/`;
 
         return new Promise((resolve, reject) => {
@@ -245,7 +245,7 @@ module.exports = async function () {
         "Neither valid potential nor valid version label found. Please check if this is intentional.";
     }
 
-    const hasVersionLabels = async (ticketMetadata) => {
+    const hasVersionLabels = async (ticketMetadata, ticketScope) => {
         const versionLabelsRegex = `version:\\d+\\.\\d+\\.\\d+`;
         const validVersionLabels = await getLabelsMatchingRegexp(ticketMetadata, versionLabelsRegex);
 
@@ -351,11 +351,11 @@ module.exports = async function () {
         return;
     }
 
-    const potentialLabels = await getPotentialLabels(ticketMetadata);
+    const potentialLabels = await getPotentialLabels(ticketMetadata, ticketScope);
 
     // validate
 
-    if (!hasPotentialLabels(potentialLabels) && !await hasVersionLabels(ticketMetadata)) {
+    if (!hasPotentialLabels(potentialLabels) && !await hasVersionLabels(ticketMetadata, ticketScope)) {
         await postGithubComment(ticketMetadata, getNoLabelCommentText());
         console.log("Neither `potential:` nor `version:` label found. Exiting.");
         return;
@@ -368,9 +368,9 @@ module.exports = async function () {
 
     // fetch
 
-    const downloadPage = await fetchDownloadPage();
+    const downloadPage = await fetchDownloadPage(ticketScope);
 
-    const versionLabelsMap = await getVersionLabelsMap(potentialLabels, downloadPage);
+    const versionLabelsMap = await getVersionLabelsMap(potentialLabels, downloadPage, ticketScope);
 
     // only potential labels that have a version label will be removed
     const nonNullVersionLabelsEntries = Object.entries(versionLabelsMap)
