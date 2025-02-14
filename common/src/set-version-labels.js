@@ -69,7 +69,7 @@ module.exports = async function () {
     }
 
     const getMinorFromPotentialLabel = function (potentialLabel, ticketScope) {
-        const regex = /potential:(\d+\.\d+)\.\d+/;
+        const regex = getMinorFromPotentialLabelRegex(ticketScope);
         const match = potentialLabel.match(regex);
 
         return match ? match[1] : null;
@@ -265,6 +265,20 @@ module.exports = async function () {
         }
 
         console.log("Scope not recognized. Returning null version label regex");
+        return null;
+    }
+
+    const getMinorFromPotentialLabelRegex = (ticketScope) => {
+
+        if (isScopeCamundaPlatform7(ticketScope)) {
+            return /potential:(\d+\.\d+)\.\d+/;
+        }
+
+        if (isScopeOptimize(ticketScope)) {
+            return /potential:version (\d+\.\d+)\.\d+/;
+        }
+
+        console.log("Scope not recognized. Returning null minor version from potential label regex");
         return null;
     }
 
