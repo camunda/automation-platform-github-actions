@@ -254,13 +254,27 @@ module.exports = async function () {
         return null;
     }
 
+    const getVersionLabelRegex = (ticketScope) => {
+
+        if (isScopeCamundaPlatform7(ticketScope)) {
+            return `version:\\d+\\.\\d+\\.\\d+`;
+        }
+
+        if (isScopeOptimize(ticketScope)) {
+            return `version:optimize \\d+\\.\\d+\\.\\d+`;
+        }
+
+        console.log("Scope not recognized. Returning null version label regex");
+        return null;
+    }
+
     const getNoLabelCommentText = () => {
         return "### Set Version Labels Action \n" + 
         "Neither valid potential nor valid version label found. Please check if this is intentional.";
     }
 
     const hasVersionLabels = async (ticketMetadata, ticketScope) => {
-        const versionLabelsRegex = `version:\\d+\\.\\d+\\.\\d+`;
+        const versionLabelsRegex = getVersionLabelRegex(ticketScope);
         const validVersionLabels = await getLabelsMatchingRegexp(ticketMetadata, versionLabelsRegex);
 
         return (validVersionLabels.length !== 0);
