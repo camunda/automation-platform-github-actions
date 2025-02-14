@@ -5,7 +5,7 @@ const https = require('https');
 module.exports = async function () {
 
     const getPotentialLabels = async (ticketMetadata, ticketScope) => {
-        const validPotentialLabelRegex = `potential:\\d+\\.\\d+\\.\\d+`;
+        const validPotentialLabelRegex = getPotentialLabelRegex(ticketScope);
         return getLabelsMatchingRegexp(ticketMetadata, validPotentialLabelRegex);
     }
 
@@ -240,6 +240,20 @@ module.exports = async function () {
         return commentText;
     }
 
+    const getPotentialLabelRegex = (ticketScope) => {
+
+        if (isScopeCamundaPlatform7(ticketScope)) {
+            return `potential:\\d+\\.\\d+\\.\\d+`;
+        }
+
+        if (isScopeOptimize(ticketScope)) {
+            return `potential:optimize \\d+\\.\\d+\\.\\d+`;
+        }
+
+        console.log("Scope not recognized. Returning null potential label regex");
+        return null;
+    }
+
     const getNoLabelCommentText = () => {
         return "### Set Version Labels Action \n" + 
         "Neither valid potential nor valid version label found. Please check if this is intentional.";
@@ -314,12 +328,12 @@ module.exports = async function () {
         return "Camunda Platform 7";
     }
 
-    const isScopeCamundaPlatform7 = (issueScope) => {
-        return issueScope === "Camunda Platform 7";
+    const isScopeCamundaPlatform7 = (ticketScope) => {
+        return ticketScope === "Camunda Platform 7";
     }
 
-    const isScopeOptimize = (issueScope) => {
-        return issueScope === "Optimize 7";
+    const isScopeOptimize = (ticketScope) => {
+        return ticketScope === "Optimize 7";
     }
 
     const isIssueRelatedToOptimize = async (ticketMetadata) => {
