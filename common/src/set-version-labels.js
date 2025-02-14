@@ -303,6 +303,25 @@ module.exports = async function () {
         return false;
     }
 
+    const getIssueScope = async (ticketMetadata) => {
+        // Insert here cases that should be excluded by the action
+
+        if (await isIssueRelatedToOptimize(ticketMetadata)) {
+            console.log(`Issue is related to Optimize.`);
+            return "Optimize 7";
+        }
+
+        return "Camunda Platform 7";
+    }
+
+    const isScopeCamundaPlatform7 = (issueScope) => {
+        return issueScope === "Camunda Platform 7";
+    }
+
+    const isScopeOptimize = (issueScope) => {
+        return issueScope === "Optimize 7";
+    }
+
     const isIssueRelatedToOptimize = async (ticketMetadata) => {
         return await haScopeOptimizeLabel(ticketMetadata);
     }
@@ -324,12 +343,15 @@ module.exports = async function () {
         issue_number: issueNumber
     };
 
+    const issueScope = await getIssueScope(ticketMetadata);
+    console.log(`Issue scope: ${issueScope}`);
+
     if (await isUnsupportedIssue(ticketMetadata)) {
         console.log(`Issue ${issueNumber} is not supported. Exiting.`);
         return;
     }
 
-    const potentialLabels = await getPotentialLabels(ticketMetadata);
+    const potentialLabels = await getPotentialLabels(ticketMetadata, issueScope);
 
     // validate
 
