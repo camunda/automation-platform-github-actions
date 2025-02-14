@@ -13,8 +13,9 @@ module.exports = async function () {
     const getVersionLabelsMap = async (potentialLabels, downloadPage, ticketScope) => {
         const nextMinorVersion = await getNextMinorVersion();
         const results = potentialLabels.map(potentialLabel => {
+
             if (isNextMinorReleaseVersion(potentialLabel, nextMinorVersion)) {
-                const nextMinorVersionLabel = `version:${nextMinorVersion}.0`;
+                const nextMinorVersionLabel = getNextMinorVersionLabel(nextMinorVersion, ticketScope);
                 return [potentialLabel, nextMinorVersionLabel];
             }
 
@@ -279,6 +280,20 @@ module.exports = async function () {
         }
 
         console.log("Scope not recognized. Returning null minor version from potential label regex");
+        return null;
+    }
+
+    const getNextMinorVersionLabel = (nextMinorVersion, ticketScope) => {
+
+        if (isScopeCamundaPlatform7(ticketScope)) {
+            return `version:${nextMinorVersion}.0`;
+        }
+
+        if (isScopeOptimize(ticketScope)) {
+            return `version:optimize ${nextMinorVersion}.0`;
+        }
+
+        console.log("Scope not recognized. Returning null next minor version");
         return null;
     }
 
