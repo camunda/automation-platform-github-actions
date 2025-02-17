@@ -69,7 +69,7 @@ jobs:
           output-path: ${{ github.workspace }}/dependency-diff.html
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload full diff as workflow artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: artifacts.zip
           path: |
