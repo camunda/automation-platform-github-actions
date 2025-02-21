@@ -19,8 +19,8 @@ module.exports = async function () {
         getNextMinorVersionLabel: nextMinorVersion => `version:${nextMinorVersion}.0`,
         getPotentialLabelRegex: () =>  `potential:\\d+\\.\\d+\\.\\d+`,
         getVersionLabelRegex: () => `version:\\d+\\.\\d+\\.\\d+`,
-        isScopeCamundaPlatform7: () => false,
-        isScopeOptimize: () => true,
+        isScopeCamundaPlatform7: () => true,
+        isScopeOptimize: () => false,
         ticketScope: () =>  "Camunda Platform 7"
     }
 
@@ -36,8 +36,8 @@ module.exports = async function () {
             const nextMinorVersion = await getNextMinorVersion();
             results = potentialLabels.map(potentialLabel => {
 
-                if (isNextMinorReleaseVersion(potentialLabel, nextMinorVersion)) {
-                    const nextMinorVersionLabel = getNextMinorVersionLabel(nextMinorVersion, appConfig);
+                if (isNextMinorReleaseVersion(potentialLabel, nextMinorVersion, appConfig)) {
+                    const nextMinorVersionLabel = appConfig.getNextMinorVersionLabel(nextMinorVersion);
                     return [potentialLabel, nextMinorVersionLabel];
                 }
 
@@ -178,8 +178,8 @@ module.exports = async function () {
         return match ? `${match[1]}` : null;
     }
 
-    const isNextMinorReleaseVersion = function (potentialLabel, nextMinorVersion) {
-        return getMinorFromPotentialLabel(potentialLabel) === nextMinorVersion
+    const isNextMinorReleaseVersion = function (potentialLabel, nextMinorVersion, appConfig) {
+        return getMinorFromPotentialLabel(potentialLabel, appConfig) === nextMinorVersion
     }
 
     async function fetchDownloadPage() {
