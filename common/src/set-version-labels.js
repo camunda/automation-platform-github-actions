@@ -144,7 +144,7 @@ module.exports = async function () {
                     }
                     console.log(versions);
                     const firstPatchVersion = versions.values().next().value
-                    return `version:optimize` + firstPatchVersion; 
+                    return `version:optimize ` + firstPatchVersion;
                 } else {
                     const matchJson = downloadPage.match(patchVersionRegex);
                     let versionsJsonString = matchJson ? matchJson[2] : null;
