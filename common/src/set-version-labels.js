@@ -158,6 +158,29 @@ module.exports = async function () {
         });
     }
 
+    const syncLabelsColor = async (ticketMetadata, labelsToCheck) => {
+        console.log('Sync color for labels');
+        const versionLabelColor = '83b6ff';
+        try {
+            const { data: labelsOnIssue } = await octokit.rest.issues.listLabelsOnIssue(ticketMetadata);
+            console.log(`Retrieved labels from issue:`, JSON.stringify(labelsOnIssue, null, 2));
+            const filteredLabels = labelsOnIssue.filter(l => labelsToCheck.includes(l.name) && l.color !== versionLabelColor);
+            for (const label of filteredLabels) {
+                await octokit.rest.issues.updateLabel({
+                    owner: ticketMetadata.owner,
+                    repo: ticketMetadata.repo,
+                    name: label.name,
+                    color: versionLabelColor,
+                    description: label.description || '',
+                });
+                console.log(`Updated label: ${label.name} to color: ${versionLabelColor}`);
+            }
+            console.log('Completed syncing labels color');
+        } catch (error) {
+            console.error('Error when syncing labels color:', error);
+        }
+    }
+
     const setLabels = async function (ticketMetadata, labels) {
         console.log(`Set labels for issue: #${issueNumber}:`, labels);
         try {
@@ -257,6 +280,7 @@ module.exports = async function () {
 
         await setLabels(ticketMetadata, uniqueVersionLabelsToAssign);
         await removeLabels(ticketMetadata, potentialLabelsToRemove);
+        await syncLabelsColor(ticketMetadata, uniqueVersionLabelsToAssign);
     }
 
     const hasPotentialLabels = (potentialLabels) => {
