@@ -56,13 +56,13 @@ module.exports = async function () {
             results = potentialLabels.map(potentialLabel => {
                 // For maintenance versions, find the latest patch from repo
                 const latestPatchVersion = getLatestPatchVersion(potentialLabel, downloadPage, appConfig);
-                console.log(`${potentialLabel} => has Latest Patch Version: ${latestPatchVersion}`);
 
                 if (latestPatchVersion == null) {
                     console.log(`No patch version was found in downloads page for potentialLabel: ${potentialLabel}. Returning entry with null version.`);
                     return [potentialLabel, null];
                 }
 
+                console.log(`${potentialLabel} => has Latest Patch Version: ${latestPatchVersion}`);
                 return [potentialLabel, getNextPatchVersion(latestPatchVersion)];
             });
         }
@@ -142,8 +142,11 @@ module.exports = async function () {
                 while ((match = patchVersionRegex.exec(downloadPage)) !== null) {
                     versions.add(match[1]);
                 }
-                console.log(versions);
+
                 const firstPatchVersion = versions.values().next().value;
+                if (!firstPatchVersion) {
+                    return null;
+                }
                 return `version:optimize ` + firstPatchVersion;
             } else {
                 const matchJson = downloadPage.match(patchVersionRegex);
@@ -369,7 +372,7 @@ module.exports = async function () {
         issue_number: issueNumber
     };
 
-    const appConfig = await isIssueRelatedToOptimize(ticketMetadata) ? optimize : platform
+    const appConfig = await isIssueRelatedToOptimize(ticketMetadata) ? optimize : platform;
     console.log(`Ticket scope: ${appConfig.ticketScope()}`);
 
     if (await isUnsupportedIssue(ticketMetadata)) {
