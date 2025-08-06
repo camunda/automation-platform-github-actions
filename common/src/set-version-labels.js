@@ -4,33 +4,72 @@ const https = require('https');
 
 module.exports = async function () {
 
-    const getPotentialLabels = async (ticketMetadata) => {
-        const validPotentialLabelRegex = `potential:\\d+\\.\\d+\\.\\d+`;
+    const optimize = {
+        getMinorFromPotentialLabelRegex: () => /potential:optimize (\d+\.\d+)\.\d+/,
+        getNextMinorVersionLabel: nextMinorVersion => `version:optimize ${nextMinorVersion}.0`,
+        getPotentialLabelRegex: () => `potential:optimize \\d+\\.\\d+\\.\\d+`,
+        getVersionLabelRegex: () => `version:optimize \\d+\\.\\d+\\.\\d+`,
+        isScopeCamundaPlatform7: () => false,
+        isScopeOptimize: () => true,
+        ticketScope: () => "Optimize 7"
+
+    }
+    const platform = {
+        getMinorFromPotentialLabelRegex: () => /potential:(\d+\.\d+)\.\d+/,
+        getNextMinorVersionLabel: nextMinorVersion => `version:${nextMinorVersion}.0`,
+        getPotentialLabelRegex: () => `potential:\\d+\\.\\d+\\.\\d+`,
+        getVersionLabelRegex: () => `version:\\d+\\.\\d+\\.\\d+`,
+        isScopeCamundaPlatform7: () => true,
+        isScopeOptimize: () => false,
+        ticketScope: () => "Camunda Platform 7"
+    }
+
+    const getPotentialLabels = async (ticketMetadata, appConfig) => {
+        const validPotentialLabelRegex = appConfig.getPotentialLabelRegex();
         return getLabelsMatchingRegexp(ticketMetadata, validPotentialLabelRegex);
     }
 
     // Returns Map with [potentialLabel - versionLabel entries]
-    const getVersionLabelsMap = async (potentialLabels, downloadPage) => {
-        const nextMinorVersion = await getNextMinorVersion();
-        const results = potentialLabels.map(potentialLabel => {
-            if (isNextMinorReleaseVersion(potentialLabel, nextMinorVersion)) {
-                const nextMinorVersionLabel = `version:${nextMinorVersion}.0`;
-                return [potentialLabel, nextMinorVersionLabel];
-            }
+    const getVersionLabelsMap = async (potentialLabels, downloadPage, appConfig) => {
+        let results
+        if (appConfig.isScopeCamundaPlatform7()) {
+            const nextMinorVersion = await getNextMinorVersion();
+            results = potentialLabels.map(potentialLabel => {
 
-            // For maintenance versions, find the latest patch from repo
-            const latestPatchVersion = getLatestPatchVersion(potentialLabel, downloadPage);
-            console.log(`${potentialLabel} => has Latest Patch Version: ${latestPatchVersion}`);
+                if (isNextMinorReleaseVersion(potentialLabel, nextMinorVersion, appConfig)) {
+                    const nextMinorVersionLabel = appConfig.getNextMinorVersionLabel(nextMinorVersion);
+                    return [potentialLabel, nextMinorVersionLabel];
+                }
 
-            if (latestPatchVersion == null) {
-                console.log(`No patch version was found in downloads page for potentialLabel: ${potentialLabel}. Returning entry with null version.`);
-                return [potentialLabel, null];
-            }
+                // For maintenance versions, find the latest patch from repo
+                const latestPatchVersion = getLatestPatchVersion(potentialLabel, downloadPage, appConfig);
+                console.log(`${potentialLabel} => has Latest Patch Version: ${latestPatchVersion}`);
 
-            return [potentialLabel, getNextPatchVersion(latestPatchVersion)];
-        });
+                if (latestPatchVersion == null) {
+                    console.log(`No patch version was found in downloads page for potentialLabel: ${potentialLabel}. Returning entry with null version.`);
+                    return [potentialLabel, null];
+                }
+
+                return [potentialLabel, getNextPatchVersion(latestPatchVersion)];
+            });
+        } else if (appConfig.isScopeOptimize()) {
+            results = potentialLabels.map(potentialLabel => {
+                // For maintenance versions, find the latest patch from repo
+                const latestPatchVersion = getLatestPatchVersion(potentialLabel, downloadPage, appConfig);
+
+                if (latestPatchVersion == null) {
+                    console.log(`No patch version was found in downloads page for potentialLabel: ${potentialLabel}. Returning entry with null version.`);
+                    return [potentialLabel, null];
+                }
+
+                console.log(`${potentialLabel} => has Latest Patch Version: ${latestPatchVersion}`);
+                return [potentialLabel, getNextPatchVersion(latestPatchVersion)];
+            });
+        }
 
         return Object.fromEntries(results);
+
+
     };
 
     const removeLabels = async function (ticketMetadata, labels) {
@@ -68,8 +107,8 @@ module.exports = async function () {
         }
     }
 
-    const getMinorFromPotentialLabel = function (potentialLabel) {
-        const regex = /potential:(\d+\.\d+)\.\d+/;
+    const getMinorFromPotentialLabel = function (potentialLabel, appConfig) {
+        const regex = appConfig.getMinorFromPotentialLabelRegex();
         const match = potentialLabel.match(regex);
 
         return match ? match[1] : null;
@@ -81,10 +120,10 @@ module.exports = async function () {
         return versionParts.join('.');
     }
 
-    const getLatestPatchVersion = function (potentialLabel, downloadPage) {
+    const getLatestPatchVersion = function (potentialLabel, downloadPage, appConfig) {
         console.debug(`Get latest patch version for issue: #${issueNumber} for potential label:`, potentialLabel);
         try {
-            const minorVersion = getMinorFromPotentialLabel(potentialLabel);
+            const minorVersion = getMinorFromPotentialLabel(potentialLabel, appConfig);
 
             if (!minorVersion) {
                 console.log(`No Minor version found in the potential label. Returning null.`);
@@ -92,33 +131,47 @@ module.exports = async function () {
             } else {
                 console.log(`Minor version found: ${minorVersion}`);
             }
+            let patchVersionRegex = appConfig.isScopeCamundaPlatform7() ?
+                new RegExp(`(camDownloads\\.branches\\['${minorVersion}'\\]\\s*=\\s*)(\\[[\\s\\S]*?\\])(\\s*;)`)
+                : new RegExp(`href=["']https:\\/\\/downloads\\.camunda\\.cloud\\/enterprise-release\\/optimize\\/(${minorVersion}\\.\\d+)\\/[^"']+["']`, "g");
 
-            const patchVersionRegex = new RegExp(`(camDownloads\\.branches\\['${minorVersion}'\\]\\s*=\\s*)(\\[[\\s\\S]*?\\])(\\s*;)`);
-            const matchJson = downloadPage.match(patchVersionRegex);
 
-            // Return the version if found, otherwise return null
-            let versionsJsonString = matchJson ? matchJson[2] : null;
+            if (appConfig.isScopeOptimize()) {
+                const versions = new Set();
+                let match;
+                while ((match = patchVersionRegex.exec(downloadPage)) !== null) {
+                    versions.add(match[1]);
+                }
 
-            if (versionsJsonString == null) {
-                console.warn(`No patch version could be extracted for potential label: ${potentialLabel}. Returning null.`);
-                return null;
+                const firstPatchVersion = versions.values().next().value;
+                if (!firstPatchVersion) {
+                    return null;
+                }
+                return `version:optimize ` + firstPatchVersion;
+            } else {
+                const matchJson = downloadPage.match(patchVersionRegex);
+                let versionsJsonString = matchJson ? matchJson[2] : null;
+
+                if (versionsJsonString == null) {
+                    console.warn(`No patch version could be extracted for potential label: ${potentialLabel}. Returning null.`);
+                    return null;
+                }
+
+                console.debug(`Patch Versions to fetch first element:`, versionsJsonString);
+
+                const extractFirstPatchVersionFromJson = new RegExp(`(number\\: ')(.*)('\\,)`);
+                const matchFirstPatch = versionsJsonString.match(extractFirstPatchVersionFromJson);
+                let firstPatchVersion = matchFirstPatch ? matchFirstPatch[2] : null;
+                console.debug(`The latest Patch version is: ${firstPatchVersion}`);
+                return `version:` + firstPatchVersion;
             }
-
-            console.debug(`Patch Versions to fetch first element:`, versionsJsonString);
-
-            const extractFirstPatchVersionFromJson = new RegExp(`(number\\: ')(.*)('\\,)`);
-            const matchFirstPatch = versionsJsonString.match(extractFirstPatchVersionFromJson);
-            let firstPatchVersion = matchFirstPatch ? matchFirstPatch[2] : null;
-
-            console.debug(`The latest Patch version is: ${firstPatchVersion}`);
-            return `version:` + firstPatchVersion;
         } catch (error) {
             console.error("Error while calculating Patch version:", error);
             return null;
         }
     }
 
-    const getNextMinorVersion = async function() {
+    const getNextMinorVersion = async function () {
         const url = `https://github.com/camunda/camunda-bpm-platform/raw/refs/heads/master/pom.xml`;
         const response = await fetch(url);
         const pomXml = await response.text();
@@ -128,12 +181,12 @@ module.exports = async function () {
         return match ? `${match[1]}` : null;
     }
 
-    const isNextMinorReleaseVersion = function (potentialLabel, nextMinorVersion) {
-        return getMinorFromPotentialLabel(potentialLabel) === nextMinorVersion
+    const isNextMinorReleaseVersion = function (potentialLabel, nextMinorVersion, appConfig) {
+        return getMinorFromPotentialLabel(potentialLabel, appConfig) === nextMinorVersion
     }
 
     async function fetchDownloadPage() {
-        const url = `https://docs.camunda.org/enterprise/download/`;
+        const url = 'https://docs.camunda.org/enterprise/download/';
 
         return new Promise((resolve, reject) => {
             https.get(url, (response) => {
@@ -210,26 +263,26 @@ module.exports = async function () {
 
         const patchVersionMissMatch = Object.entries(potentialToVersionLabelsMap)
             .filter(([potentialLabel, versionLabel]) => {
-                    return versionLabel !== null && potentialLabel.replace('potential:') !== versionLabel.replace('version:')
-                }
+                return versionLabel !== null && potentialLabel.replace('potential:') !== versionLabel.replace('version:')
+            }
             );
-    
-        if(potentialLabelsNotMatched.length === 0 && patchVersionMissMatch.length === 0) {
+
+        if (potentialLabelsNotMatched.length === 0 && patchVersionMissMatch.length === 0) {
             return null
         }
 
-        if(potentialLabelsNotMatched.length) {
+        if (potentialLabelsNotMatched.length) {
             commentText += (
                 "#### Potential Labels with Non-Existing Minor: \n - " +
-                potentialLabelsNotMatched.join("\n - ") + 
+                potentialLabelsNotMatched.join("\n - ") +
                 "\n"
             );
         }
 
-        if(patchVersionMissMatch.length) {
+        if (patchVersionMissMatch.length) {
             commentText += (
                 "#### Patch Version Mismatch: \n" +
-                "|Potential Label| Version Label | \n" + 
+                "|Potential Label| Version Label | \n" +
                 "|---|---| \n" +
                 patchVersionMissMatch
                     .map(([potentialLabel, versionLabel]) => `|${potentialLabel}|${versionLabel}|`)
@@ -241,12 +294,12 @@ module.exports = async function () {
     }
 
     const getNoLabelCommentText = () => {
-        return "### Set Version Labels Action \n" + 
-        "Neither valid potential nor valid version label found. Please check if this is intentional.";
+        return "### Set Version Labels Action \n" +
+            "Neither valid potential nor valid version label found. Please check if this is intentional.";
     }
 
-    const hasVersionLabels = async (ticketMetadata) => {
-        const versionLabelsRegex = `version:\\d+\\.\\d+\\.\\d+`;
+    const hasVersionLabels = async (ticketMetadata, appConfig) => {
+        const versionLabelsRegex = appConfig.getVersionLabelRegex();
         const validVersionLabels = await getLabelsMatchingRegexp(ticketMetadata, versionLabelsRegex);
 
         return (validVersionLabels.length !== 0);
@@ -290,11 +343,6 @@ module.exports = async function () {
     const isUnsupportedIssue = async (ticketMetadata) => {
         // Insert here cases that should be excluded by the action
 
-        if (await isIssueRelatedToOptimize(ticketMetadata)) {
-            console.log(`Issue is related to Optimize.`);
-            return true;
-        }
-
         if (await isIssueRelatedCommunityWork(ticketMetadata)) {
             console.log(`Issue is related to Community Work.`);
             return true;
@@ -318,22 +366,25 @@ module.exports = async function () {
     const octokit = github.getOctokit(repoToken);
 
     const repo = github.context.payload.repository;
-    const ticketMetadata = { 
+    const ticketMetadata = {
         repo: repo.name,
         owner: repo.owner.login,
         issue_number: issueNumber
     };
+
+    const appConfig = await isIssueRelatedToOptimize(ticketMetadata) ? optimize : platform;
+    console.log(`Ticket scope: ${appConfig.ticketScope()}`);
 
     if (await isUnsupportedIssue(ticketMetadata)) {
         console.log(`Issue ${issueNumber} is not supported. Exiting.`);
         return;
     }
 
-    const potentialLabels = await getPotentialLabels(ticketMetadata);
+    const potentialLabels = await getPotentialLabels(ticketMetadata, appConfig);
 
     // validate
 
-    if (!hasPotentialLabels(potentialLabels) && !await hasVersionLabels(ticketMetadata)) {
+    if (!hasPotentialLabels(potentialLabels) && !await hasVersionLabels(ticketMetadata, appConfig)) {
         await postGithubComment(ticketMetadata, getNoLabelCommentText());
         console.log("Neither `potential:` nor `version:` label found. Exiting.");
         return;
@@ -348,7 +399,8 @@ module.exports = async function () {
 
     const downloadPage = await fetchDownloadPage();
 
-    const versionLabelsMap = await getVersionLabelsMap(potentialLabels, downloadPage);
+    const versionLabelsMap = await getVersionLabelsMap(potentialLabels, downloadPage, appConfig);
+    console.log({ versionLabelsMap });
 
     // only potential labels that have a version label will be removed
     const nonNullVersionLabelsEntries = Object.entries(versionLabelsMap)
@@ -360,7 +412,7 @@ module.exports = async function () {
 
     const commentText = getWarningCommentText(versionLabelsMap);
 
-    if(commentText) {
+    if (commentText) {
         console.log("Adding comment");
         await postGithubComment(ticketMetadata, commentText);
     }
