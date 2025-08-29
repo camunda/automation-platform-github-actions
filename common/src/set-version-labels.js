@@ -408,7 +408,8 @@ module.exports = async function () {
      * @returns {Promise<string|null>} - DRI username or null if not found
      */
     const fetchDRIField = async (ticketMetadata) => {
-        const query = `
+        // First, let's try to get the project items using the current approach
+        const projectItemsQuery = `
             query($owner: String!, $repo: String!, $number: Int!) {
                 repository(owner: $owner, name: $repo) {
                     issue(number: $number) {
@@ -419,6 +420,59 @@ module.exports = async function () {
                                 project { 
                                     title 
                                     number 
+                                    id
+                                }
+                                fieldValues(first: 50) {
+                                    nodes {
+                                        ... on ProjectV2ItemFieldSingleSelectValue {
+                                            field { 
+                                                ... on ProjectV2SingleSelectField { 
+                                                    name 
+                                                } 
+                                            }
+                                            name
+                                        }
+                                        ... on ProjectV2ItemFieldUserValue {
+                                            field { 
+                                                ... on ProjectV2Field {
+                                                    name 
+                                                }
+                                            }
+                                            users(first: 10) { 
+                                                nodes { 
+                                                    login 
+                                                    name 
+                                                } 
+                                            }
+                                        }
+                                        ... on ProjectV2ItemFieldTextValue {
+                                            field { 
+                                                ... on ProjectV2Field {
+                                                    name 
+                                                }
+                                            }
+                                            text
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        `;
+
+        // If the above doesn't work, let's try querying the specific project directly
+        const specificProjectQuery = `
+            query($owner: String!, $projectNumber: Int!, $issueId: ID!) {
+                organization(login: $owner) {
+                    projectV2(number: $projectNumber) {
+                        items(first: 100) {
+                            nodes {
+                                content {
+                                    ... on Issue {
+                                        id
+                                    }
                                 }
                                 fieldValues(first: 50) {
                                     nodes {
@@ -461,11 +515,13 @@ module.exports = async function () {
         `;
 
         try {
-            const response = await octokit.graphql(query, {
+            // First try the original approach
+            const response = await octokit.graphql(projectItemsQuery, {
                 owner: ticketMetadata.owner,
                 repo: ticketMetadata.repo,
                 number: parseInt(ticketMetadata.issue_number, 10)
             });
+
             console.log({response: JSON.stringify(response, null, 2)});
             const issue = response.repository.issue;
             console.log(`Found issue: ${issue.title} (ID: ${issue.id})`);
@@ -493,6 +549,52 @@ module.exports = async function () {
                         if (fieldValue.text) {
                             console.log(`Found DRI (Text field): ${fieldValue.text}`);
                             return fieldValue.text;
+                        }
+                    }
+                }
+            }
+
+            // If no project items found, try querying the specific project directly
+            if (issue.projectItems.nodes.length === 0) {
+                console.log('No project items found, trying specific project query...');
+
+                const specificResponse = await octokit.graphql(specificProjectQuery, {
+                    owner: ticketMetadata.owner,
+                    projectNumber: 40, // The specific project number you mentioned
+                    issueId: issue.id
+                });
+
+                console.log({specificResponse: JSON.stringify(specificResponse, null, 2)});
+
+                const project = specificResponse.organization.projectV2;
+                if (project && project.items) {
+                    for (const item of project.items.nodes) {
+                        // Check if this item corresponds to our issue
+                        if (item.content && item.content.id === issue.id) {
+                            console.log('Found matching issue in project 40');
+
+                            for (const fieldValue of item.fieldValues.nodes) {
+                                if (fieldValue.field && fieldValue.field.name === 'DRI') {
+                                    // Handle User field type
+                                    if (fieldValue.users && fieldValue.users.nodes.length > 0) {
+                                        const driUser = fieldValue.users.nodes[0];
+                                        console.log(`Found DRI (User field): ${driUser.login} (${driUser.name})`);
+                                        return driUser.login;
+                                    }
+
+                                    // Handle Single Select field type
+                                    if (fieldValue.name) {
+                                        console.log(`Found DRI (Select field): ${fieldValue.name}`);
+                                        return fieldValue.name;
+                                    }
+
+                                    // Handle Text field type
+                                    if (fieldValue.text) {
+                                        console.log(`Found DRI (Text field): ${fieldValue.text}`);
+                                        return fieldValue.text;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
