@@ -12,5 +12,7 @@ jobs:
         id: version-label-automation-step
         uses: camunda/automation-platform-github-actions/version-label-automation@main
         with: 
+          assignee: ${{ github.event.issue.assignee }}
+          assignees: ${{ github.event.issue.assignees }}
           issue-number: ${{ github.event.issue.number }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}

@@ -374,8 +374,36 @@ module.exports = async function () {
         return await hasMigratorLabel(ticketMetadata);
     }
 
-    // setup
+    async function fetchProjectsForIssue(ticketMetadata) {
+        const query = `
+          query($owner: String!, $repo: String!, $issueNumber: Int!) {
+            repository(owner: $owner, name: $repo) {
+              issue(number: $issueNumber) {
+                projectsNext {
+                  nodes {
+                    title
+                    id
+                    url
+                  }
+                }
+              }
+            }
+          }
+        `;
+      
+        try {
+          const response = await octokit.graphql(query, ticketMetadata);
+        
+          console.log("Projects associated with the issue:", response.repository.issue.projectsNext.nodes);
+          return response
+        } catch (error) {
+          console.error("Error fetching projects:", error);
+        }
+      }
 
+    // setup
+    const assignee = core.getInput('assignee');
+    const assignees = core.getInput('assignees');
     const issueNumber = core.getInput('issue-number');
     const repoToken = core.getInput('repo-token');
     const octokit = github.getOctokit(repoToken);
@@ -385,10 +413,23 @@ module.exports = async function () {
         repo: repo.name,
         owner: repo.owner.login,
         issue_number: issueNumber
+        // assignee,
+        // assignees
     };
 
     const appConfig = await isIssueRelatedToOptimize(ticketMetadata) ? optimize : platform;
     console.log(`Ticket scope: ${appConfig.ticketScope()}`);
+    console.log({assignee, assignees})
+
+    const { data: issueData } =  await octokit.rest.issues.get(ticketMetadata);
+
+    console.log({issueData, assignee: JSON.stringify(issueData.assignee), assignees: JSON.stringify(issueData.assignees)})
+
+    const projects = await fetchProjectsForIssue(ticketMetadata);
+
+
+    console.log({projects})
+
 
     if (await isUnsupportedIssue(ticketMetadata)) {
         console.log(`Issue ${issueNumber} is not supported. Exiting.`);

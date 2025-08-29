@@ -14,8 +14,10 @@ jobs:
     steps:
       - name: version-label-automation-step
         id: version-label-automation-step
-        uses: camunda/automation-platform-github-actions/version-label-automation@main
+        uses: camunda/automation-platform-github-actions/version-label-automation@Version-Labels-Automation-tag-dri
         with: 
+          assignee: ${{ github.event.inputs.issue }}
+          assignees: ${{ github.event.inputs.issues }}
           issue-number: ${{ github.event.inputs.issue }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
