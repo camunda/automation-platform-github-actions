@@ -431,7 +431,11 @@ module.exports = async function () {
                                             name
                                         }
                                         ... on ProjectV2ItemFieldUserValue {
-                                            field { name }
+                                            field { 
+                                                ... on ProjectV2Field {
+                                                    name 
+                                                }
+                                            }
                                             users(first: 10) { 
                                                 nodes { 
                                                     login 
@@ -440,7 +444,11 @@ module.exports = async function () {
                                             }
                                         }
                                         ... on ProjectV2ItemFieldTextValue {
-                                            field { name }
+                                            field { 
+                                                ... on ProjectV2Field {
+                                                    name 
+                                                }
+                                            }
                                             text
                                         }
                                     }
@@ -456,7 +464,7 @@ module.exports = async function () {
             const response = await octokit.graphql(query, {
                 owner: ticketMetadata.owner,
                 repo: ticketMetadata.repo,
-                number: ticketMetadata.issue_number
+                number: parseInt(ticketMetadata.issue_number, 10)
             });
 
             const issue = response.repository.issue;
