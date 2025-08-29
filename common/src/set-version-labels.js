@@ -453,6 +453,30 @@ module.exports = async function () {
                                             }
                                             text
                                         }
+                                        ... on ProjectV2ItemFieldNumberValue {
+                                            field { 
+                                                ... on ProjectV2Field {
+                                                    name 
+                                                }
+                                            }
+                                            number
+                                        }
+                                        ... on ProjectV2ItemFieldDateValue {
+                                            field { 
+                                                ... on ProjectV2Field {
+                                                    name 
+                                                }
+                                            }
+                                            date
+                                        }
+                                        ... on ProjectV2ItemFieldIterationValue {
+                                            field { 
+                                                ... on ProjectV2Field {
+                                                    name 
+                                                }
+                                            }
+                                            title
+                                        }
                                     }
                                 }
                             }
@@ -464,7 +488,7 @@ module.exports = async function () {
 
         // If the above doesn't work, let's try querying the specific project directly
         const specificProjectQuery = `
-            query($owner: String!, $projectNumber: Int!, $issueId: ID!) {
+            query($owner: String!, $projectNumber: Int!) {
                 organization(login: $owner) {
                     projectV2(number: $projectNumber) {
                         items(first: 100) {
@@ -504,6 +528,30 @@ module.exports = async function () {
                                                 }
                                             }
                                             text
+                                        }
+                                        ... on ProjectV2ItemFieldNumberValue {
+                                            field { 
+                                                ... on ProjectV2Field {
+                                                    name 
+                                                }
+                                            }
+                                            number
+                                        }
+                                        ... on ProjectV2ItemFieldDateValue {
+                                            field { 
+                                                ... on ProjectV2Field {
+                                                    name 
+                                                }
+                                            }
+                                            date
+                                        }
+                                        ... on ProjectV2ItemFieldIterationValue {
+                                            field { 
+                                                ... on ProjectV2Field {
+                                                    name 
+                                                }
+                                            }
+                                            title
                                         }
                                     }
                                 }
@@ -550,59 +598,127 @@ module.exports = async function () {
                             console.log(`Found DRI (Text field): ${fieldValue.text}`);
                             return fieldValue.text;
                         }
+
+                        // Handle Number field type
+                        if (fieldValue.number) {
+                            console.log(`Found DRI (Number field): ${fieldValue.number}`);
+                            return fieldValue.number.toString();
+                        }
+
+                        // Handle Date field type
+                        if (fieldValue.date) {
+                            console.log(`Found DRI (Date field): ${fieldValue.date}`);
+                            return fieldValue.date;
+                        }
+
+                        // Handle Iteration field type
+                        if (fieldValue.title) {
+                            console.log(`Found DRI (Iteration field): ${fieldValue.title}`);
+                            return fieldValue.title;
+                        }
                     }
                 }
             }
 
             // If no project items found, try querying the specific project directly
             if (issue.projectItems.nodes.length === 0) {
-                console.log('No project items found, trying specific project query...');
+                console.log('No project items found, trying to find available projects...');
 
-                const specificResponse = await octokit.graphql(specificProjectQuery, {
-                    owner: ticketMetadata.owner,
-                    projectNumber: 40, // The specific project number you mentioned
-                    issueId: issue.id
-                });
-
-                console.log({specificResponse: JSON.stringify(specificResponse, null, 2)});
-
-                const project = specificResponse.organization.projectV2;
-                if (project && project.items) {
-                    for (const item of project.items.nodes) {
-                        // Check if this item corresponds to our issue
-                        if (item.content && item.content.id === issue.id) {
-                            console.log('Found matching issue in project 40');
-
-                            for (const fieldValue of item.fieldValues.nodes) {
-                                if (fieldValue.field && fieldValue.field.name === 'DRI') {
-                                    // Handle User field type
-                                    if (fieldValue.users && fieldValue.users.nodes.length > 0) {
-                                        const driUser = fieldValue.users.nodes[0];
-                                        console.log(`Found DRI (User field): ${driUser.login} (${driUser.name})`);
-                                        return driUser.login;
-                                    }
-
-                                    // Handle Single Select field type
-                                    if (fieldValue.name) {
-                                        console.log(`Found DRI (Select field): ${fieldValue.name}`);
-                                        return fieldValue.name;
-                                    }
-
-                                    // Handle Text field type
-                                    if (fieldValue.text) {
-                                        console.log(`Found DRI (Text field): ${fieldValue.text}`);
-                                        return fieldValue.text;
-                                    }
+                // First, let's see what projects are available
+                const listProjectsQuery = `
+                    query($owner: String!) {
+                        organization(login: $owner) {
+                            projectsV2(first: 20) {
+                                nodes {
+                                    id
+                                    number
+                                    title
+                                    url
                                 }
                             }
                         }
                     }
+                `;
+
+                try {
+                    const projectsResponse = await octokit.graphql(listProjectsQuery, {
+                        owner: ticketMetadata.owner
+                    });
+
+                    console.log('Available projects:', JSON.stringify(projectsResponse.organization.projectsV2.nodes, null, 2));
+
+                    // Try to find a project that might contain our issue
+                    for (const project of projectsResponse.organization.projectsV2.nodes) {
+                        console.log(`Checking project: ${project.title} (number: ${project.number})`);
+
+                        try {
+                            const specificResponse = await octokit.graphql(specificProjectQuery, {
+                                owner: ticketMetadata.owner,
+                                projectNumber: project.number
+                            });
+
+                            console.log(`Project ${project.number} query successful, checking for issue...`);
+
+                            if (specificResponse.organization.projectV2 && specificResponse.organization.projectV2.items) {
+                                for (const item of specificResponse.organization.projectV2.items.nodes) {
+                                    // Check if this item corresponds to our issue
+                                    if (item.content && item.content.id === issue.id) {
+                                        console.log(`Found matching issue in project ${project.number}: ${project.title}`);
+
+                                        for (const fieldValue of item.fieldValues.nodes) {
+                                            console.log(`Checking field: ${fieldValue.field?.name || 'unknown'}`);
+
+                                            if (fieldValue.field && fieldValue.field.name === 'DRI') {
+                                                // Handle User field type
+                                                if (fieldValue.users && fieldValue.users.nodes.length > 0) {
+                                                    const driUser = fieldValue.users.nodes[0];
+                                                    console.log(`Found DRI (User field): ${driUser.login} (${driUser.name})`);
+                                                    return driUser.login;
+                                                }
+
+                                                // Handle Single Select field type
+                                                if (fieldValue.name) {
+                                                    console.log(`Found DRI (Select field): ${fieldValue.name}`);
+                                                    return fieldValue.name;
+                                                }
+
+                                                // Handle Text field type
+                                                if (fieldValue.text) {
+                                                    console.log(`Found DRI (Text field): ${fieldValue.text}`);
+                                                    return fieldValue.text;
+                                                }
+
+                                                // Handle Number field type
+                                                if (fieldValue.number) {
+                                                    console.log(`Found DRI (Number field): ${fieldValue.number}`);
+                                                    return fieldValue.number.toString();
+                                                }
+
+                                                // Handle Date field type
+                                                if (fieldValue.date) {
+                                                    console.log(`Found DRI (Date field): ${fieldValue.date}`);
+                                                    return fieldValue.date;
+                                                }
+
+                                                // Handle Iteration field type
+                                                if (fieldValue.title) {
+                                                    console.log(`Found DRI (Iteration field): ${fieldValue.title}`);
+                                                    return fieldValue.title;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (projectError) {
+                            console.log(`Failed to query project ${project.number}: ${projectError.message}`);
+                            continue; // Try the next project
+                        }
+                    }
+                } catch (listError) {
+                    console.error('Error listing projects:', listError);
                 }
             }
-
-            console.log('DRI field not found in any project');
-            return null;
-
         } catch (error) {
             console.error('Error fetching DRI field:', error);
             return null;
