@@ -400,6 +400,106 @@ module.exports = async function () {
           console.error("Error fetching projects:", error);
         }
       }
+    /**
+     * Fetches the DRI (Directly Responsible Individual) field from a GitHub issue
+     * using the GraphQL API for GitHub Projects v2
+     *
+     * @param {Object} ticketMetadata - Contains owner, repo, issue_number
+     * @returns {Promise<string|null>} - DRI username or null if not found
+     */
+    const fetchDRIField = async (ticketMetadata) => {
+        const query = `
+            query($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                    issue(number: $number) {
+                        id
+                        title
+                        projectItems(first: 10) {
+                            nodes {
+                                project { 
+                                    title 
+                                    number 
+                                }
+                                fieldValues(first: 50) {
+                                    nodes {
+                                        ... on ProjectV2ItemFieldSingleSelectValue {
+                                            field { 
+                                                ... on ProjectV2SingleSelectField { 
+                                                    name 
+                                                } 
+                                            }
+                                            name
+                                        }
+                                        ... on ProjectV2ItemFieldUserValue {
+                                            field { name }
+                                            users(first: 10) { 
+                                                nodes { 
+                                                    login 
+                                                    name 
+                                                } 
+                                            }
+                                        }
+                                        ... on ProjectV2ItemFieldTextValue {
+                                            field { name }
+                                            text
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        `;
+
+        try {
+            const response = await octokit.graphql(query, {
+                owner: ticketMetadata.owner,
+                repo: ticketMetadata.repo,
+                number: ticketMetadata.issue_number
+            });
+
+            const issue = response.repository.issue;
+            console.log(`Found issue: ${issue.title} (ID: ${issue.id})`);
+
+            // Look through all project items to find the DRI field
+            for (const projectItem of issue.projectItems.nodes) {
+                console.log(`Checking project: ${projectItem.project.title}`);
+
+                for (const fieldValue of projectItem.fieldValues.nodes) {
+                    if (fieldValue.field && fieldValue.field.name === 'DRI') {
+                        // Handle User field type
+                        if (fieldValue.users && fieldValue.users.nodes.length > 0) {
+                            const driUser = fieldValue.users.nodes[0];
+                            console.log(`Found DRI (User field): ${driUser.login} (${driUser.name})`);
+                            return driUser.login;
+                        }
+
+                        // Handle Single Select field type (if DRI is stored as a selection)
+                        if (fieldValue.name) {
+                            console.log(`Found DRI (Select field): ${fieldValue.name}`);
+                            return fieldValue.name;
+                        }
+
+                        // Handle Text field type
+                        if (fieldValue.text) {
+                            console.log(`Found DRI (Text field): ${fieldValue.text}`);
+                            return fieldValue.text;
+                        }
+                    }
+                }
+            }
+
+            console.log('DRI field not found in any project');
+            return null;
+
+        } catch (error) {
+            console.error('Error fetching DRI field:', error);
+            return null;
+        }
+    }
+
+    // setup
 
     // setup
     const assignee = core.getInput('assignee');
@@ -416,6 +516,15 @@ module.exports = async function () {
         // assignee,
         // assignees
     };
+
+    // Fetch DRI field for the current issue
+    console.log(`Fetching DRI field for issue #${issueNumber}...`);
+    const driField = await fetchDRIField(ticketMetadata);
+    if (driField) {
+        console.log(`DRI assigned to issue #${issueNumber}: ${driField}`);
+    } else {
+        console.log(`No DRI field found for issue #${issueNumber}`);
+    }
 
     const appConfig = await isIssueRelatedToOptimize(ticketMetadata) ? optimize : platform;
     console.log(`Ticket scope: ${appConfig.ticketScope()}`);
