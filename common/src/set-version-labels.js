@@ -466,7 +466,7 @@ module.exports = async function () {
                 repo: ticketMetadata.repo,
                 number: parseInt(ticketMetadata.issue_number, 10)
             });
-
+            console.log({response: JSON.stringify(response, null, 2)});
             const issue = response.repository.issue;
             console.log(`Found issue: ${issue.title} (ID: ${issue.id})`);
 
