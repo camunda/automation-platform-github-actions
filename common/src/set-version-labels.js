@@ -33,13 +33,7 @@ module.exports = async function () {
     const getVersionLabelsMap = async (potentialLabels, downloadPage, appConfig) => {
         let results
         if (appConfig.isScopeCamundaPlatform7()) {
-            const nextMinorVersion = await getNextMinorVersion();
             results = potentialLabels.map(potentialLabel => {
-
-                if (isNextMinorReleaseVersion(potentialLabel, nextMinorVersion, appConfig)) {
-                    const nextMinorVersionLabel = appConfig.getNextMinorVersionLabel(nextMinorVersion);
-                    return [potentialLabel, nextMinorVersionLabel];
-                }
 
                 // For maintenance versions, find the latest patch from repo
                 const latestPatchVersion = getLatestPatchVersion(potentialLabel, downloadPage, appConfig);
@@ -169,20 +163,6 @@ module.exports = async function () {
             console.error("Error while calculating Patch version:", error);
             return null;
         }
-    }
-
-    const getNextMinorVersion = async function () {
-        const url = `https://github.com/camunda/camunda-bpm-platform/raw/refs/heads/master/pom.xml`;
-        const response = await fetch(url);
-        const pomXml = await response.text();
-        const versionTagRegex = /<artifactId>camunda-root<\/artifactId>\s*<version>(\d+\.\d+)(?:\.\d+.*)?<\/version>/
-        const match = pomXml.match(versionTagRegex);
-        // Return the version if found, otherwise return null
-        return match ? `${match[1]}` : null;
-    }
-
-    const isNextMinorReleaseVersion = function (potentialLabel, nextMinorVersion, appConfig) {
-        return getMinorFromPotentialLabel(potentialLabel, appConfig) === nextMinorVersion
     }
 
     async function fetchDownloadPage() {
