@@ -23,4 +23,5 @@ jobs:
       translation-webhook-secret: TEST_CHANNEL_SLACK_WEBHOOK_URL
       translation-notification-matcher: 1\.[0-9]+\.3
       notify-translation-group: ${{ inputs.notify-translation-group }}
+      generate-release-notes: true
       sec-dri-secret: SEC_DRI_SLACK_ID
