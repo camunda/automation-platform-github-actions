@@ -86,7 +86,7 @@ jobs:
       - name: Build support notification payload
         id: support-payload
         run: |
-          cat << 'EOF' > payload.json
+          cat > payload.json << 'OUTER_EOF'
           {
             "blocks": [
               {
@@ -96,19 +96,25 @@ jobs:
                   "text": "Dear support team, we have released versions ${{ inputs.versions }} of Camunda Platform 7.\nPlease send a release notification to our customers and update the customers in the support cases below. Please note that the release manager may add extra announcements in the thread of this message shortly after the message is published."
                 }
               }
-          EOF
+          OUTER_EOF
           
           if [ "${{ inputs.generate-release-notes }}" == "true" ]; then
-            echo ",${{ steps.generate-release-notes.outputs.release-notes-block }}" >> payload.json
+            cat >> payload.json << 'OUTER_EOF'
+          ,${{ steps.generate-release-notes.outputs.release-notes-block }}
+          OUTER_EOF
           fi
           
-          echo ",${{ steps.format-support-jira-links.outputs.links-blocks }}" >> payload.json
-          echo "    ]" >> payload.json
-          echo "  }" >> payload.json
+          cat >> payload.json << 'OUTER_EOF'
+          ,${{ steps.format-support-jira-links.outputs.links-blocks }}
+            ]
+          }
+          OUTER_EOF
           
-          echo "payload<<EOF" >> $GITHUB_OUTPUT
-          cat payload.json >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "payload<<EOF"
+            cat payload.json
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
       - name: Notify about fixed support cases
         uses: 8398a7/action-slack@v3
         with:
