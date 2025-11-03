@@ -56,7 +56,7 @@ jobs:
             secret/data/products/cambpm/ci/github-workflow ${{ inputs.sec-dri-secret }} | sec-dri-id;
             ${{ inputs.translation-webhook-secret && format('secret/data/products/cambpm/ci/github-workflow {0} | translation-webhook;', inputs.translation-webhook-secret) || '' }}
       - name: Generate release notes links
-        if: inputs.generate-release-notes
+        if: ${{ inputs.generate-release-notes }}
         id: generate-release-notes
         uses: camunda/automation-platform-github-actions/generate-release-notes@main
         with:
@@ -142,7 +142,7 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ steps.secrets.outputs.sec-webhook }} # from previous step that fetches secrets from Vault
       - name: Notify translation group
-        if: inputs.translation-webhook-secret != '' && (inputs.notify-translation-group == true || inputs.translation-notification-matcher != '')
+        if: ${{ inputs.translation-webhook-secret != '' && (inputs.notify-translation-group == true || inputs.translation-notification-matcher != '') }}
         run: |
           SHOULD_NOTIFY=false
           

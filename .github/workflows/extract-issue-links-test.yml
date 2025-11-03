@@ -17,9 +17,10 @@ jobs:
     uses: camunda/automation-platform-github-actions/.github/workflows/extract-issue-links.yml@main    
     secrets: inherit
     with: 
-      versions: ${{ github.event.inputs.versions }}
+      versions: ${{ inputs.versions }}
       support-webhook-secret: TEST_CHANNEL_SLACK_WEBHOOK_URL
       sec-webhook-secret: TEST_CHANNEL_SLACK_WEBHOOK_URL
       translation-webhook-secret: TEST_CHANNEL_SLACK_WEBHOOK_URL
       translation-notification-matcher: 1\.[0-9]+\.3
+      notify-translation-group: ${{ inputs.notify-translation-group }}
       sec-dri-secret: SEC_DRI_SLACK_ID
