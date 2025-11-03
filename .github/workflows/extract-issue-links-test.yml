@@ -6,7 +6,11 @@ on:
       versions:
         description: 'Release versions (comma-separated list, e.g. 7.17.0,7.16.3,7.15.8)'
         required: true
-
+      notify-translation-group:
+        description: 'Notify the translation group via slack message'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   call-reusable-flow:

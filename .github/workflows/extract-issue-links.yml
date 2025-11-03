@@ -17,16 +17,25 @@ on:
         type: string
       translation-webhook-secret:
         description: 'Name of the Vault secret that holds the translation project channel slack webhook'
-        required: true
+        required: false
         type: string
       translation-notification-matcher:
         description: 'Regular expression (POSIX ERE) to match a version for which the translation notification should be sent'
-        required: true
+        required: false
         type: string
+      notify-translation-group:
+        description: 'Whether to notify the translation group (overrides regex matching if set)'
+        required: false
+        type: boolean
       sec-dri-secret:
         description: 'Name of the Vault secret that contains the slack ID of the DRI for security notices'
         required: true
         type: string
+      generate-release-notes:
+        description: 'Whether to generate release notes links'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   extract-issue-links:
@@ -44,9 +53,10 @@ jobs:
           secrets: |
             secret/data/products/cambpm/ci/github-workflow ${{ inputs.support-webhook-secret }} | support-webhook;
             secret/data/products/cambpm/ci/github-workflow ${{ inputs.sec-webhook-secret }} | sec-webhook;
-            secret/data/products/cambpm/ci/github-workflow ${{ inputs.translation-webhook-secret }} | translation-webhook;
             secret/data/products/cambpm/ci/github-workflow ${{ inputs.sec-dri-secret }} | sec-dri-id;
+            ${{ inputs.translation-webhook-secret && format('secret/data/products/cambpm/ci/github-workflow {0} | translation-webhook;', inputs.translation-webhook-secret) || '' }}
       - name: Generate release notes links
+        if: inputs.generate-release-notes
         id: generate-release-notes
         uses: camunda/automation-platform-github-actions/generate-release-notes@main
         with:
@@ -73,24 +83,37 @@ jobs:
           links: ${{ steps.extract-issue-links.outputs.links-reverse }}
           issues: ${{ steps.extract-issue-links.outputs.issues }}
           jira-project: "SEC"
+      - name: Build support notification payload
+        id: support-payload
+        run: |
+          cat << 'EOF' > payload.json
+          {
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "Dear support team, we have released versions ${{ inputs.versions }} of Camunda Platform 7.\nPlease send a release notification to our customers and update the customers in the support cases below. Please note that the release manager may add extra announcements in the thread of this message shortly after the message is published."
+                }
+              }
+          EOF
+          
+          if [ "${{ inputs.generate-release-notes }}" == "true" ]; then
+            echo ",${{ steps.generate-release-notes.outputs.release-notes-block }}" >> payload.json
+          fi
+          
+          echo ",${{ steps.format-support-jira-links.outputs.links-blocks }}" >> payload.json
+          echo "    ]" >> payload.json
+          echo "  }" >> payload.json
+          
+          echo "payload<<EOF" >> $GITHUB_OUTPUT
+          cat payload.json >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       - name: Notify about fixed support cases
         uses: 8398a7/action-slack@v3
         with:
           status: custom
-          custom_payload: |
-            {
-              blocks: [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "Dear support team, we have released versions ${{ inputs.versions }} of Camunda Platform 7.\nPlease send a release notification to our customers and update the customers in the support cases below. Please note that the release manager may add extra announcements in the thread of this message shortly after the message is published."
-                  }
-                },
-                ${{ steps.generate-release-notes.outputs.release-notes-block }},
-                ${{ steps.format-support-jira-links.outputs.links-blocks }}
-              ]
-            }
+          custom_payload: ${{ steps.support-payload.outputs.payload }}
         env:
           SLACK_WEBHOOK_URL: ${{ steps.secrets.outputs.support-webhook }} # from previous step that fetches secrets from Vault  
       - name: Notify about fixed SEC issues
@@ -112,30 +135,40 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ steps.secrets.outputs.sec-webhook }} # from previous step that fetches secrets from Vault
-      - name: Determine necessity to send optional notifications
-        run: |
-          if [[ "${{ inputs.versions }}" =~ (,|^)[[:space:]]*${{ inputs.translation-notification-matcher }}[[:space:]]*(,|$) ]]; then
-            echo "NOTIFY_TRANSLATIONS=true" >> $GITHUB_ENV;
-            echo "Translation version regex matched. Conditional flag is set."
-          else
-            echo "Translation version regex not matched. Conditional flag is not set."
-          fi
       - name: Notify translation group
-        if: env.NOTIFY_TRANSLATIONS == 'true'
-        uses: 8398a7/action-slack@v3
-        with:
-          status: custom
-          custom_payload: |
-            {
-              blocks: [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "Dear translation project group, we have released version(s) ${{ inputs.versions }}.\nHappy translating!"
+        if: ${{ inputs.translation-webhook-secret != ''}}
+        run: |
+          SHOULD_NOTIFY=false
+          
+          # Check if notify-translation-group is explicitly set (for workflow_dispatch)
+          if [ "${{ inputs.notify-translation-group }}" == "true" ]; then
+            echo "Translation notification explicitly enabled via checkbox."
+            SHOULD_NOTIFY=true
+          # Fall back to regex matching if translation-notification-matcher is provided
+          elif [ -n "${{ inputs.translation-notification-matcher }}" ]; then
+            if [[ "${{ inputs.versions }}" =~ (,|^)[[:space:]]*${{ inputs.translation-notification-matcher }}[[:space:]]*(,|$) ]]; then
+              echo "Translation version regex matched."
+              SHOULD_NOTIFY=true
+            else
+              echo "Translation version regex not matched."
+            fi
+          fi
+          
+          if [ "$SHOULD_NOTIFY" == "true" ]; then
+            echo "Sending translation notification."
+            curl -X POST "${{ steps.secrets.outputs.translation-webhook }}" \
+              -H 'Content-Type: application/json' \
+              -d '{
+                "blocks": [
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "Dear translation project group, we have released version(s) ${{ inputs.versions }}.\nHappy translating!"
+                    }
                   }
-                }
-              ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ steps.secrets.outputs.translation-webhook }}
+                ]
+              }'
+          else
+            echo "Skipping translation notification."
+          fi
