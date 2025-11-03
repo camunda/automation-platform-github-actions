@@ -142,16 +142,16 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ steps.secrets.outputs.sec-webhook }} # from previous step that fetches secrets from Vault
       - name: Notify translation group
-        if: ${{ inputs.translation-webhook-secret != ''}}
+        if: inputs.translation-webhook-secret != '' && (inputs.notify-translation-group == true || inputs.translation-notification-matcher != '')
         run: |
           SHOULD_NOTIFY=false
           
-          # Check if notify-translation-group is explicitly set (for workflow_dispatch)
+          # Check if notify-translation-group is explicitly set (for workflow_dispatch or direct override)
           if [ "${{ inputs.notify-translation-group }}" == "true" ]; then
             echo "Translation notification explicitly enabled via checkbox."
             SHOULD_NOTIFY=true
           # Fall back to regex matching if translation-notification-matcher is provided
-          elif [ -n "${{ inputs.translation-notification-matcher }}" ]; then
+          elif [ ! -z "${{ inputs.translation-notification-matcher }}" ]; then
             if [[ "${{ inputs.versions }}" =~ (,|^)[[:space:]]*${{ inputs.translation-notification-matcher }}[[:space:]]*(,|$) ]]; then
               echo "Translation version regex matched."
               SHOULD_NOTIFY=true
