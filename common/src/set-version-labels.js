@@ -235,8 +235,22 @@ module.exports = async function () {
         });
     }
 
-    const getWarningCommentText = (potentialToVersionLabelsMap) => {
-        let commentText = "### Set Version Labels Action \n";
+    const getAssigneeMentions = async (ticketMetadata) => {
+        try {
+            const { data: issue } = await octokit.rest.issues.get(ticketMetadata);
+            if (issue.assignees && issue.assignees.length > 0) {
+                return issue.assignees.map(assignee => `@${assignee.login}`).join(' ');
+            }
+            return '';
+        } catch (error) {
+            console.error('Error fetching assignees:', error);
+            return '';
+        }
+    }
+
+    const getWarningCommentText = async (potentialToVersionLabelsMap, ticketMetadata) => {
+        const assigneeMentions = await getAssigneeMentions(ticketMetadata);
+        let commentText = `### Set Version Labels Action \n${assigneeMentions ? assigneeMentions + '\n\n' : ''}`;
         const potentialLabelsNotMatched = Object.entries(potentialToVersionLabelsMap)
             .filter(([_, versionLabel]) => versionLabel === null)
             .map(([potentialLabel, _]) => potentialLabel);
@@ -273,8 +287,9 @@ module.exports = async function () {
         return commentText;
     }
 
-    const getNoLabelCommentText = () => {
-        return "### Set Version Labels Action \n" +
+    const getNoLabelCommentText = async (ticketMetadata) => {
+        const assigneeMentions = await getAssigneeMentions(ticketMetadata);
+        return `### Set Version Labels Action \n${assigneeMentions ? assigneeMentions + '\n\n' : ''}` +
             "Neither valid potential nor valid version label found. Please check if this is intentional.";
     }
 
@@ -380,7 +395,7 @@ module.exports = async function () {
     // validate
 
     if (!hasPotentialLabels(potentialLabels) && !await hasVersionLabels(ticketMetadata, appConfig)) {
-        await postGithubComment(ticketMetadata, getNoLabelCommentText());
+        await postGithubComment(ticketMetadata, await getNoLabelCommentText(ticketMetadata));
         console.log("Neither `potential:` nor `version:` label found. Exiting.");
         return;
     }
@@ -405,7 +420,7 @@ module.exports = async function () {
 
     await removePotentialAndSetVersionLabels(nonNullVersionLabelsEntries);
 
-    const commentText = getWarningCommentText(versionLabelsMap);
+    const commentText = await getWarningCommentText(versionLabelsMap, ticketMetadata);
 
     if (commentText) {
         console.log("Adding comment");
