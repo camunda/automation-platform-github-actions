@@ -24,6 +24,12 @@ module.exports = async function () {
     // (i.e. ensures that there is a sequence LLLL-DDD where L is a letter and D is a digit
     const linkRegex = /\bhttps?:\/\/\S+[A-Za-z]+-[0-9]+/gi;
     
+    // List of JIRA issues to ignore
+    const ignoredIssues = [
+      'https://jira.camunda.com/browse/SUPPORT-12398',
+      'https://jira.camunda.com/browse/SEC-12398'
+    ];
+
     var links = new Map();    // issue id => [url, ..]
     const issues = new Map();   // issue id => {}
     
@@ -52,7 +58,10 @@ module.exports = async function () {
             const linksForIssue = [];
             
             for (const [url] of linkMatches) {
-              linksForIssue.push(url);
+              // Skip ignored JIRA issues
+              if (!ignoredIssues.includes(url)) {
+                linksForIssue.push(url);
+              }
             }
             
             if (linksForIssue.length > 0) {
