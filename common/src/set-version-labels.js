@@ -312,10 +312,10 @@ module.exports = async function () {
         return (communityWorkLabel.length !== 0);
     }
 
-    const hasMigratorLabel = async (ticketMetadata) => {
-        const migratorLabel = await getLabelsMatchingRegexp(ticketMetadata, `scope:data-migrator`);
+    const hasMigratorToolingLabel = async (ticketMetadata) => {
+        const migratorToolingLabel = await getLabelsMatchingRegexp(ticketMetadata, `scope:(data-migrator|model-converter|code-converter|identity-migration)`);
 
-        return (migratorLabel.length !== 0);
+        return (migratorToolingLabel.length !== 0);
     }
 
     const removePotentialAndSetVersionLabels = async (nonNullVersionLabelsEntries) => {
@@ -349,8 +349,8 @@ module.exports = async function () {
             return true;
         }
 
-        if (await isIssueRelatedToMigrator(ticketMetadata)) {
-            console.log(`Issue is related to Data migrator.`);
+        if (await isIssueRelatedToMigratorTooling(ticketMetadata)) {
+            console.log(`Issue is related to Migrator Tooling.`);
             return true;
         }
 
@@ -365,8 +365,8 @@ module.exports = async function () {
         return await hasCommunityWorkLabel(ticketMetadata);
     }
 
-    const isIssueRelatedToMigrator = async (ticketMetadata) => {
-        return await hasMigratorLabel(ticketMetadata);
+    const isIssueRelatedToMigratorTooling = async (ticketMetadata) => {
+        return await hasMigratorToolingLabel(ticketMetadata);
     }
 
     // setup
