@@ -112,6 +112,10 @@ class SBOM {
     return this.rootComponent.isEqualTo(other.rootComponent);
   }
   
+  getProjectComponentId() {
+    return this.rootComponent.purl;
+  }
+  
   addComponent(component) {
     this.components.set(component.bomRef, component);
   }
