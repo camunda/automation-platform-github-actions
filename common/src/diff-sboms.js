@@ -22,6 +22,14 @@ module.exports = async function () {
     const repoToken = core.getInput('repo-token');
     const outputPath = core.getInput('output-path');
 
+    // Check if SBOM files exist before processing
+    if (!fs.existsSync(baseSbomPath) || !fs.existsSync(headSbomPath)) {
+        core.info('SBOM files do not exist. Skipping dependency diff.');
+        core.info(`Base SBOM path: ${baseSbomPath} (exists: ${fs.existsSync(baseSbomPath)})`);
+        core.info(`Head SBOM path: ${headSbomPath} (exists: ${fs.existsSync(headSbomPath)})`);
+        return;
+    }
+
     const octokit = github.getOctokit(repoToken);
     const repo = github.context.payload.repository;
     const prNumber = github.context.payload.number;
