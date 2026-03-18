@@ -36,6 +36,10 @@ on:
         required: false
         type: boolean
         default: false
+      environment-update-url:
+        description: 'URL to the environment update release announcement page (e.g. https://docs.camunda.org/enterprise/announcement/#environment-update-release-april-2026). When provided, the support notification will include a block instructing the support team to copy the environment update content from this URL.'
+        required: false
+        type: string
 
 jobs:
   extract-issue-links:
@@ -104,6 +108,23 @@ jobs:
           OUTER_EOF
           fi
           
+          if [ -n "${{ inputs.environment-update-url }}" ]; then
+            ENV_UPDATE_URL="${{ inputs.environment-update-url }}"
+            if [[ "$ENV_UPDATE_URL" =~ ^https://docs\.camunda\.org/ ]]; then
+              cat >> payload.json << OUTER_EOF
+          ,{
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "Please copy the environment update content from the <${ENV_UPDATE_URL}|environment update release announcement> and include it in the customer communication."
+              }
+            }
+          OUTER_EOF
+            else
+              echo "Warning: environment-update-url does not start with https://docs.camunda.org/ – skipping environment update block."
+            fi
+          fi
+
           cat >> payload.json << 'OUTER_EOF'
           ,${{ steps.format-support-jira-links.outputs.links-blocks }}
             ]
