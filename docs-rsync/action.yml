@@ -217,6 +217,7 @@ runs:
 
         rsync "${rsync_args[@]}" \
           -e "${ssh_command[*]}" \
+          -- \
           "$STAGE_SOURCE" \
           "$SSH_USER@$SSH_HOST:$STAGE_TARGET"
 
@@ -253,7 +254,7 @@ runs:
 
         stage_target_quoted="$(printf '%q' "$STAGE_TARGET")"
         live_target_quoted="$(printf '%q' "$LIVE_TARGET")"
-        rsync_cmd="rsync ${rsync_args[*]} $stage_target_quoted $live_target_quoted"
+        rsync_cmd="rsync ${rsync_args[*]} -- $stage_target_quoted $live_target_quoted"
 
         ssh "${ssh_opts[@]}" "$SSH_USER@$SSH_HOST" "$rsync_cmd"
 
