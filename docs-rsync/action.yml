@@ -1,0 +1,270 @@
+name: 'Docs rsync'
+description: 'Generic public-safe docs publish and promotion via SSH/rsync'
+inputs:
+  mode:
+    description: 'Operation mode: stage or live'
+    required: false
+    default: 'stage'
+  source:
+    description: 'Local build output directory (required in stage mode)'
+    required: false
+  folder:
+    description: 'Relative target folder under docs root'
+    required: true
+  dry-run:
+    description: 'When true, perform a dry run without changing remote files'
+    required: false
+    default: 'true'
+  ssh-user:
+    description: 'SSH username'
+    required: true
+  ssh-host:
+    description: 'SSH host'
+    required: true
+  ssh-private-key:
+    description: 'SSH private key content'
+    required: true
+  known-hosts:
+    description: 'known_hosts entries for strict host verification'
+    required: true
+  stage-root:
+    description: 'Root directory for staged docs on the remote host'
+    required: true
+  live-root:
+    description: 'Root directory for live docs on the remote host'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate inputs and compute paths
+      id: validate
+      shell: bash
+      env:
+        INPUT_MODE: ${{ inputs.mode }}
+        INPUT_SOURCE: ${{ inputs.source }}
+        INPUT_FOLDER: ${{ inputs.folder }}
+        INPUT_DRY_RUN: ${{ inputs.dry-run }}
+        INPUT_SSH_USER: ${{ inputs.ssh-user }}
+        INPUT_SSH_HOST: ${{ inputs.ssh-host }}
+        INPUT_SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
+        INPUT_KNOWN_HOSTS: ${{ inputs.known-hosts }}
+        INPUT_STAGE_ROOT: ${{ inputs.stage-root }}
+        INPUT_LIVE_ROOT: ${{ inputs.live-root }}
+      run: |
+        set -euo pipefail
+
+        mode="$INPUT_MODE"
+        dry_run="$INPUT_DRY_RUN"
+        folder="$INPUT_FOLDER"
+        source_dir="$INPUT_SOURCE"
+        stage_root="$INPUT_STAGE_ROOT"
+        live_root="$INPUT_LIVE_ROOT"
+
+        case "$mode" in
+          stage|live) ;;
+          *)
+            echo "Invalid mode. Allowed values: stage, live" >&2
+            exit 1
+            ;;
+        esac
+
+        case "$dry_run" in
+          true|false) ;;
+          *)
+            echo "Invalid dry-run. Allowed values: true, false" >&2
+            exit 1
+            ;;
+        esac
+
+        required_names=(ssh-user ssh-host ssh-private-key known-hosts stage-root live-root)
+        required_values=("$INPUT_SSH_USER" "$INPUT_SSH_HOST" "$INPUT_SSH_PRIVATE_KEY" "$INPUT_KNOWN_HOSTS" "$stage_root" "$live_root")
+        for i in "${!required_names[@]}"; do
+          if [[ -z "${required_values[$i]}" ]]; then
+            echo "Missing required input: ${required_names[$i]}" >&2
+            exit 1
+          fi
+        done
+
+        if [[ -z "$folder" ]]; then
+          echo "folder must not be empty" >&2
+          exit 1
+        fi
+        if [[ "$folder" == /* ]]; then
+          echo "folder must be a relative path" >&2
+          exit 1
+        fi
+        if [[ ! "$folder" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+          echo "folder contains invalid characters" >&2
+          exit 1
+        fi
+        if [[ "$folder" == "." ]]; then
+          echo "folder must not be '.'" >&2
+          exit 1
+        fi
+        if [[ "$folder" == ./* ]]; then
+          echo "folder must not start with './'" >&2
+          exit 1
+        fi
+        if [[ "$folder" == */. ]]; then
+          echo "folder must not end with '/.'" >&2
+          exit 1
+        fi
+        if [[ "$folder" == *"/./"* ]]; then
+          echo "folder must not contain '/./'" >&2
+          exit 1
+        fi
+        if [[ "$folder" == *".."* ]]; then
+          echo "folder must not contain '..'" >&2
+          exit 1
+        fi
+        if [[ "$folder" == *"//"* ]]; then
+          echo "folder must not contain '//'" >&2
+          exit 1
+        fi
+
+        if [[ "$mode" == "stage" ]]; then
+          if [[ -z "$source_dir" ]]; then
+            echo "source is required in stage mode" >&2
+            exit 1
+          fi
+          if [[ ! -d "$source_dir" ]]; then
+            echo "source directory does not exist: $source_dir" >&2
+            exit 1
+          fi
+        fi
+
+        dry_run_flag=""
+        if [[ "$dry_run" == "true" ]]; then
+          dry_run_flag="--dry-run"
+        fi
+
+        stage_source=""
+        if [[ -n "$source_dir" ]]; then
+          stage_source="${source_dir%/}/"
+        fi
+
+        stage_target="${stage_root%/}/$folder/"
+        live_target="${live_root%/}/$folder/"
+
+        {
+          echo "mode=$mode"
+          echo "dry_run=$dry_run"
+          echo "dry_run_flag=$dry_run_flag"
+          echo "stage_source=$stage_source"
+          echo "stage_target=$stage_target"
+          echo "live_target=$live_target"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Prepare SSH files
+      id: ssh
+      shell: bash
+      env:
+        INPUT_SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
+        INPUT_KNOWN_HOSTS: ${{ inputs.known-hosts }}
+      run: |
+        set -euo pipefail
+
+        if [[ -z "$INPUT_SSH_PRIVATE_KEY" ]]; then
+          echo "Missing required input: ssh-private-key" >&2
+          exit 1
+        fi
+        if [[ -z "$INPUT_KNOWN_HOSTS" ]]; then
+          echo "Missing required input: known-hosts" >&2
+          exit 1
+        fi
+
+        ssh_dir="$(mktemp -d)"
+        key_file="$ssh_dir/id_rsa"
+        known_hosts_file="$ssh_dir/known_hosts"
+
+        printf '%s\n' "$INPUT_SSH_PRIVATE_KEY" > "$key_file"
+        printf '%s\n' "$INPUT_KNOWN_HOSTS" > "$known_hosts_file"
+
+        chmod 600 "$key_file"
+        chmod 600 "$known_hosts_file"
+
+        {
+          echo "ssh_dir=$ssh_dir"
+          echo "key_file=$key_file"
+          echo "known_hosts_file=$known_hosts_file"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Sync docs to stage
+      if: ${{ steps.validate.outputs.mode == 'stage' }}
+      shell: bash
+      env:
+        SSH_USER: ${{ inputs.ssh-user }}
+        SSH_HOST: ${{ inputs.ssh-host }}
+        DRY_RUN_FLAG: ${{ steps.validate.outputs.dry_run_flag }}
+        STAGE_SOURCE: ${{ steps.validate.outputs.stage_source }}
+        STAGE_TARGET: ${{ steps.validate.outputs.stage_target }}
+        SSH_KEY_FILE: ${{ steps.ssh.outputs.key_file }}
+        SSH_KNOWN_HOSTS_FILE: ${{ steps.ssh.outputs.known_hosts_file }}
+      run: |
+        set -euo pipefail
+
+        rsync_args=(-azv --delete-after)
+        if [[ -n "$DRY_RUN_FLAG" ]]; then
+          rsync_args+=(--dry-run)
+        fi
+
+        ssh_command=(
+          ssh
+          -i "$SSH_KEY_FILE"
+          -o StrictHostKeyChecking=yes
+          -o UserKnownHostsFile="$SSH_KNOWN_HOSTS_FILE"
+        )
+
+        rsync "${rsync_args[@]}" \
+          -e "${ssh_command[*]}" \
+          "$STAGE_SOURCE" \
+          "$SSH_USER@$SSH_HOST:$STAGE_TARGET"
+
+    - name: Promote docs to live
+      if: ${{ steps.validate.outputs.mode == 'live' }}
+      shell: bash
+      env:
+        SSH_USER: ${{ inputs.ssh-user }}
+        SSH_HOST: ${{ inputs.ssh-host }}
+        DRY_RUN: ${{ steps.validate.outputs.dry_run }}
+        DRY_RUN_FLAG: ${{ steps.validate.outputs.dry_run_flag }}
+        STAGE_TARGET: ${{ steps.validate.outputs.stage_target }}
+        LIVE_TARGET: ${{ steps.validate.outputs.live_target }}
+        SSH_KEY_FILE: ${{ steps.ssh.outputs.key_file }}
+        SSH_KNOWN_HOSTS_FILE: ${{ steps.ssh.outputs.known_hosts_file }}
+      run: |
+        set -euo pipefail
+
+        ssh_opts=(
+          -i "$SSH_KEY_FILE"
+          -o StrictHostKeyChecking=yes
+          -o UserKnownHostsFile="$SSH_KNOWN_HOSTS_FILE"
+        )
+
+        if [[ "$DRY_RUN" == "false" ]]; then
+          live_target_quoted="$(printf '%q' "$LIVE_TARGET")"
+          ssh "${ssh_opts[@]}" "$SSH_USER@$SSH_HOST" "mkdir -p $live_target_quoted"
+        fi
+
+        rsync_args=(-av --delete-after)
+        if [[ -n "$DRY_RUN_FLAG" ]]; then
+          rsync_args+=(--dry-run)
+        fi
+
+        stage_target_quoted="$(printf '%q' "$STAGE_TARGET")"
+        live_target_quoted="$(printf '%q' "$LIVE_TARGET")"
+        rsync_cmd="rsync ${rsync_args[*]} $stage_target_quoted $live_target_quoted"
+
+        ssh "${ssh_opts[@]}" "$SSH_USER@$SSH_HOST" "$rsync_cmd"
+
+    - name: Cleanup SSH files
+      if: ${{ always() }}
+      shell: bash
+      env:
+        SSH_DIR: ${{ steps.ssh.outputs.ssh_dir }}
+      run: |
+        set -euo pipefail
+        if [[ -n "${SSH_DIR:-}" && -d "$SSH_DIR" ]]; then
+          rm -rf "$SSH_DIR"
+        fi
+
