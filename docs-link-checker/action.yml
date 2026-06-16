@@ -81,7 +81,7 @@ runs:
           exit 1
         fi
 
-        venv_dir="${RUNNER_TEMP:-$(mktemp -d)}/docs-link-checker-venv-${INPUT_PYLINKVALIDATOR_VERSION}"
+        venv_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/docs-link-checker-venv-${INPUT_PYLINKVALIDATOR_VERSION}-XXXXXXXX")"
         "$python_bin" -m venv "$venv_dir"
 
         if [[ -f "$venv_dir/bin/python" ]]; then
@@ -93,7 +93,7 @@ runs:
           exit 1
         fi
 
-        "$checker_python" -m pip --disable-pip-version-check --no-input install "pyLinkValidator==${INPUT_PYLINKVALIDATOR_VERSION}"
+        "$checker_python" -m pip --disable-pip-version-check --no-input install "soupsieve==2.2.1" "beautifulsoup4==4.12.3" "pyLinkValidator==${INPUT_PYLINKVALIDATOR_VERSION}"
 
         "$checker_python" - <<'PY'
         from pylinkvalidator.api import crawl
