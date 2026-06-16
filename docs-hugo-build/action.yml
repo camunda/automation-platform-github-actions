@@ -127,7 +127,7 @@ runs:
           )
         fi
 
-        if ! curl "${curl_args[@]}" "$release_api_url" -o "$release_json"; then
+        if ! curl "${curl_args[@]}" --retry 3 --retry-delay 2 "$release_api_url" -o "$release_json"; then
           echo "Failed to fetch Hugo release metadata from $release_api_url. Ensure tag v${version} exists and the workflow is not rate-limited." >&2
           exit 1
         fi
@@ -241,15 +241,7 @@ runs:
           exit 1
         fi
 
-        hugo_cmd=("$hugo_bin" --source "$source_dir")
-
-        if [[ -n "$destination_dir" ]]; then
-          if [[ "$destination_dir" == -* ]]; then
-            echo "destination must not start with '-'" >&2
-            exit 1
-          fi
-          hugo_cmd+=(--destination "$destination_dir")
-        fi
+        hugo_cmd=("$hugo_bin")
 
         if [[ -n "$extra_args" ]]; then
           # extra-args are split by shell words; quoted groups inside the string are not preserved.
@@ -257,7 +249,31 @@ runs:
           # shellcheck disable=SC2206
           extra_args_array=( $extra_args )
           set +f
+
+          for arg in "${extra_args_array[@]}"; do
+            case "$arg" in
+              --source|-s|--source=*|-s=*|--destination|-d|--destination=*|-d=*)
+                echo "extra-args must not override source or destination" >&2
+                exit 1
+                ;;
+              server)
+                echo "extra-args must not include Hugo subcommand 'server'" >&2
+                exit 1
+                ;;
+            esac
+          done
+
           hugo_cmd+=("${extra_args_array[@]}")
+        fi
+
+        hugo_cmd+=(--source "$source_dir")
+
+        if [[ -n "$destination_dir" ]]; then
+          if [[ "$destination_dir" == -* ]]; then
+            echo "destination must not start with '-'" >&2
+            exit 1
+          fi
+          hugo_cmd+=(--destination "$destination_dir")
         fi
 
         "${hugo_cmd[@]}"

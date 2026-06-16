@@ -21,7 +21,7 @@ The action is intentionally generic and repository-agnostic:
 | `source` | Yes | - | Path to the Hugo site/project directory |
 | `destination` | No | - | Optional Hugo output directory (`--destination`) |
 | `hugo-version` | No | `0.54.0` | Hugo version to install (default keeps Jenkins parity) |
-| `extra-args` | No | - | Extra arguments appended to the Hugo command (split on whitespace; quoted groups are not preserved) |
+| `extra-args` | No | - | Extra arguments appended to the Hugo command (split on whitespace; quoted groups are not preserved). `--source`, `--destination`, and `server` are rejected. |
 | `extended` | No | `false` | Install extended Hugo binary; must be `true` or `false` |
 
 ## Behavior
@@ -32,7 +32,7 @@ The action is intentionally generic and repository-agnostic:
 - adds downloaded Hugo binary to `PATH`
 - runs `hugo --source <source>`
 - adds `--destination <destination>` when `destination` is set
-- appends `extra-args` when provided (split on whitespace with glob expansion disabled)
+- appends `extra-args` when provided (split on whitespace with glob expansion disabled), but rejects `--source`, `--destination`, and `server`
 
 ## Example usage
 
