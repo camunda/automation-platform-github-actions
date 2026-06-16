@@ -24,14 +24,15 @@ Findings:
 
 | Input | Required | Default | Description |
 | --- | --- | --- | --- |
-| `source` | Yes | - | Path to built docs/output directory to check |
+| `source` | Yes (unless `base-url` is set) | - | Path to built docs/output directory to check |
 | `base-url` | No | - | Optional `http(s)` URL to check instead of serving `source` |
 | `ignore-regex` | No | - | Python regex matched via `re.match` against each broken URL path |
 | `pylinkvalidator-version` | No | `0.3` | Version of `pyLinkValidator` installed via pip |
 
 ## Behavior
 
-- fails fast if `source` does not exist
+- fails fast if neither `source` nor `base-url` is provided
+- validates that `source` exists when local serving mode is used
 - validates `base-url` format when provided
 - creates an isolated virtual environment and installs pinned `pyLinkValidator`
 - runs a Python wrapper based on `pylinkvalidator.api.crawl(<target-url>)`

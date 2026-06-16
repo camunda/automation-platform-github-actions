@@ -2,8 +2,8 @@ name: "Docs link checker"
 description: "Run deterministic docs link checks with pyLinkValidator"
 inputs:
   source:
-    description: "Path to built docs/output directory to check"
-    required: true
+    description: "Path to built docs/output directory to check (required when base-url is not provided)"
+    required: false
   base-url:
     description: "Optional base URL to check instead of serving the local source directory"
     required: false
@@ -27,11 +27,11 @@ runs:
       run: |
         set -euo pipefail
 
-        if [[ -z "$INPUT_SOURCE" ]]; then
-          echo "Missing required input: source" >&2
+        if [[ -z "$INPUT_SOURCE" && -z "$INPUT_BASE_URL" ]]; then
+          echo "Missing required input: source (or provide base-url)" >&2
           exit 1
         fi
-        if [[ ! -d "$INPUT_SOURCE" ]]; then
+        if [[ -n "$INPUT_SOURCE" && ! -d "$INPUT_SOURCE" ]]; then
           echo "source directory does not exist: $INPUT_SOURCE" >&2
           exit 1
         fi
