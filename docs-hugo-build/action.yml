@@ -163,14 +163,44 @@ runs:
         })"
 
         archive_url="https://github.com/gohugoio/hugo/releases/download/v${version}/${archive_name}"
+        checksums_url="https://github.com/gohugoio/hugo/releases/download/v${version}/hugo_${version}_checksums.txt"
 
         install_root="${RUNNER_TEMP:-$(mktemp -d)}/docs-hugo-build-${version}"
         bin_dir="$install_root/bin"
         archive_path="$install_root/$archive_name"
+        checksums_path="$install_root/hugo_${version}_checksums.txt"
 
         mkdir -p "$bin_dir"
 
-        curl -fsSL "$archive_url" -o "$archive_path"
+        if ! curl -fsSL --retry 3 --retry-delay 2 "$archive_url" -o "$archive_path"; then
+          echo "Failed to fetch Hugo archive from $archive_url" >&2
+          exit 1
+        fi
+
+        if ! curl -fsSL --retry 3 --retry-delay 2 "$checksums_url" -o "$checksums_path"; then
+          echo "Failed to fetch Hugo checksums from $checksums_url" >&2
+          exit 1
+        fi
+
+        checksum_line="$(grep -F "  $archive_name" "$checksums_path" | head -n 1 || true)"
+        if [[ -z "$checksum_line" ]]; then
+          echo "No checksum entry found for ${archive_name} in ${checksums_url}" >&2
+          exit 1
+        fi
+
+        (
+          cd "$install_root"
+          if command -v sha256sum >/dev/null 2>&1; then
+            printf '%s\n' "$checksum_line" | sha256sum -c -
+          elif command -v shasum >/dev/null 2>&1; then
+            printf '%s\n' "$checksum_line" | shasum -a 256 -c -
+          else
+            echo "sha256sum or shasum is required to verify Hugo archive checksum" >&2
+            exit 1
+          fi
+        )
+
+        rm -f "$checksums_path"
 
         tar -xzf "$archive_path" -C "$bin_dir" hugo
         rm -f "$archive_path"
