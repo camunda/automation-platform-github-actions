@@ -1,0 +1,193 @@
+name: "Docs Hugo build"
+description: "Build Hugo docs with a pinned Hugo version (default 0.54.0)"
+inputs:
+  source:
+    description: "Path to the Hugo site/project directory"
+    required: true
+  destination:
+    description: "Optional output directory passed to Hugo via --destination"
+    required: false
+  hugo-version:
+    description: "Hugo version to install"
+    required: false
+    default: "0.54.0"
+  extra-args:
+    description: "Extra arguments appended to the Hugo command"
+    required: false
+  extended:
+    description: "Install Hugo extended build (true or false)"
+    required: false
+    default: "false"
+runs:
+  using: "composite"
+  steps:
+    - name: Validate inputs
+      shell: bash
+      env:
+        INPUT_SOURCE: ${{ inputs.source }}
+        INPUT_DESTINATION: ${{ inputs.destination }}
+        INPUT_HUGO_VERSION: ${{ inputs.hugo-version }}
+        INPUT_EXTENDED: ${{ inputs.extended }}
+      run: |
+        set -euo pipefail
+
+        if [[ -z "$INPUT_SOURCE" ]]; then
+          echo "Missing required input: source" >&2
+          exit 1
+        fi
+        if [[ ! -d "$INPUT_SOURCE" ]]; then
+          echo "source directory does not exist: $INPUT_SOURCE" >&2
+          exit 1
+        fi
+
+        if [[ -n "$INPUT_DESTINATION" && "$INPUT_DESTINATION" == -* ]]; then
+          echo "destination must not start with '-'" >&2
+          exit 1
+        fi
+
+        if [[ ! "$INPUT_HUGO_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "Invalid hugo-version. Expected semantic version like 0.54.0" >&2
+          exit 1
+        fi
+
+        case "$INPUT_EXTENDED" in
+          true|false) ;;
+          *)
+            echo "Invalid extended value. Allowed values: true, false" >&2
+            exit 1
+            ;;
+        esac
+
+    - name: Install Hugo
+      shell: bash
+      env:
+        INPUT_HUGO_VERSION: ${{ inputs.hugo-version }}
+        INPUT_EXTENDED: ${{ inputs.extended }}
+      run: |
+        set -euo pipefail
+
+        version="$INPUT_HUGO_VERSION"
+        extended="$INPUT_EXTENDED"
+
+        os_name="$(uname -s)"
+        arch_name="$(uname -m)"
+
+        case "$os_name" in
+          Linux) ;;
+          Darwin) ;;
+          *)
+            echo "Unsupported runner OS: $os_name" >&2
+            exit 1
+            ;;
+        esac
+
+        release_prefix="hugo"
+        if [[ "$extended" == "true" ]]; then
+          release_prefix="hugo_extended"
+        fi
+
+        case "$os_name" in
+          Linux)
+            case "$arch_name" in
+              x86_64|amd64) preferred_suffixes=("Linux-64bit") ;;
+              arm64|aarch64) preferred_suffixes=("Linux-ARM64" "Linux-64bit") ;;
+              *)
+                echo "Unsupported runner architecture on Linux: $arch_name" >&2
+                exit 1
+                ;;
+            esac
+            ;;
+          Darwin)
+            # Newer Hugo uses darwin-universal, older Hugo uses macOS-64bit.
+            preferred_suffixes=("darwin-universal" "macOS-64bit")
+            ;;
+        esac
+
+        release_api_url="https://api.github.com/repos/gohugoio/hugo/releases/tags/v${version}"
+        archive_name="$({
+          RELEASE_PREFIX="$release_prefix" \
+          VERSION="$version" \
+          PREFERRED_SUFFIXES="$(IFS=:; echo "${preferred_suffixes[*]}")" \
+          curl -fsSL "$release_api_url" | ruby -rjson -e '
+            payload = JSON.parse(STDIN.read)
+            prefix = ENV.fetch("RELEASE_PREFIX")
+            suffixes = ENV.fetch("PREFERRED_SUFFIXES").split(":")
+            asset_names = payload.fetch("assets").map { |a| a.fetch("name") }
+
+            selected = nil
+            suffixes.each do |suffix|
+              candidate = asset_names.find { |n| n == "#{prefix}_#{ENV.fetch("VERSION")}_#{suffix}.tar.gz" }
+              if candidate
+                selected = candidate
+                break
+              end
+            end
+
+            if selected.nil?
+              STDERR.puts "No matching Hugo archive found for version #{ENV.fetch("VERSION")} with prefix #{prefix}"
+              STDERR.puts "Available archives:"
+              asset_names.grep(/\.tar\.gz\z/).each { |n| STDERR.puts "  - #{n}" }
+              exit 1
+            end
+
+            puts selected
+          '
+        })"
+
+        archive_url="https://github.com/gohugoio/hugo/releases/download/v${version}/${archive_name}"
+
+        install_root="${RUNNER_TEMP:-$(mktemp -d)}/docs-hugo-build-${version}"
+        bin_dir="$install_root/bin"
+        archive_path="$install_root/$archive_name"
+
+        mkdir -p "$bin_dir"
+
+        curl -fsSL "$archive_url" -o "$archive_path"
+
+        tar -xzf "$archive_path" -C "$bin_dir" hugo
+        chmod +x "$bin_dir/hugo"
+
+        if [[ -n "${GITHUB_PATH:-}" ]]; then
+          printf '%s\n' "$bin_dir" >> "$GITHUB_PATH"
+        fi
+
+        "$bin_dir/hugo" version
+
+    - name: Build docs with Hugo
+      shell: bash
+      env:
+        INPUT_SOURCE: ${{ inputs.source }}
+        INPUT_DESTINATION: ${{ inputs.destination }}
+        INPUT_EXTRA_ARGS: ${{ inputs.extra-args }}
+      run: |
+        set -euo pipefail
+
+        source_dir="$INPUT_SOURCE"
+        destination_dir="$INPUT_DESTINATION"
+        extra_args="$INPUT_EXTRA_ARGS"
+
+        if ! command -v hugo >/dev/null 2>&1; then
+          echo "hugo is not available on PATH" >&2
+          exit 1
+        fi
+
+        hugo_cmd=(hugo --source "$source_dir")
+
+        if [[ -n "$destination_dir" ]]; then
+          if [[ "$destination_dir" == -* ]]; then
+            echo "destination must not start with '-'" >&2
+            exit 1
+          fi
+          hugo_cmd+=(--destination "$destination_dir")
+        fi
+
+        if [[ -n "$extra_args" ]]; then
+          # extra-args are split by shell words; quoted groups inside the string are not preserved.
+          set -f
+          # shellcheck disable=SC2206
+          extra_args_array=( $extra_args )
+          set +f
+          hugo_cmd+=("${extra_args_array[@]}")
+        fi
+
+        "${hugo_cmd[@]}"
