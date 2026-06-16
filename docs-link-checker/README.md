@@ -15,7 +15,7 @@ Read-only parity search paths:
 Findings:
 
 - `jenkins-job-dsl-seed-jobs/src/main/groovy/util/ScriptResources.groovy` defines `DOWNLOAD_PYLINKVALIDATOR` and `linkCheckerScript`.
-- Jenkins installs `python34` + `python34-pip`, then installs `soupsieve==2.2.1`, `beautifulsoup4==4.12.3`, and `pylinkvalidator` via `pip3.4`.
+- Jenkins installs `python34` + `python34-pip`, then installs `soupsieve==2.2.1`, `beautifulsoup4==4.12.3`, and `pyLinkValidator` (imported as `pylinkvalidator`) via `pip3.4`.
 - Jenkins then runs `python3.4 infra-core/cmd/link-checker/link-checker.py -u http://localhost:1313 -i <ignoreRegex>` after starting `hugo server`.
 - `infra-core/cmd/link-checker/link-checker.py` applies `-i/--ignore` as a Python regex using `re.match` against each broken URL path.
 - This action keeps parity at behavior level for link validation (HTTP crawl + failing on errors) while using a reusable deterministic setup: pinned `pyLinkValidator` in an isolated virtual environment.
