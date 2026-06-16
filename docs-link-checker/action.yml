@@ -47,6 +47,10 @@ runs:
         fi
 
         if [[ -n "$INPUT_IGNORE_REGEX" ]]; then
+          if ! command -v python3 >/dev/null 2>&1; then
+            echo "python3 is required to validate ignore-regex but is not available on PATH" >&2
+            exit 1
+          fi
           IGNORE_REGEX="$INPUT_IGNORE_REGEX" \
             python3 -c 'import os,re; re.compile(os.environ["IGNORE_REGEX"])'
         fi
@@ -69,13 +73,11 @@ runs:
         "$python_bin" -m venv "$venv_dir"
         "$venv_dir/bin/python" -m pip --disable-pip-version-check --no-input install "pyLinkValidator==${INPUT_PYLINKVALIDATOR_VERSION}"
 
-        checker_bin="$venv_dir/bin/pylinkvalidate.py"
-        if [[ ! -x "$checker_bin" ]]; then
-          echo "pylinkvalidate.py was not installed as expected" >&2
-          exit 1
-        fi
+        "$venv_dir/bin/python" - <<'PY'
+        from pylinkvalidator.api import crawl
 
-        "$checker_bin" --version
+        print("pylinkvalidator API import OK")
+        PY
 
         {
           echo "venv_dir=$venv_dir"
@@ -105,8 +107,9 @@ runs:
           target_url="$base_url"
         else
           port="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
+          http_log="${RUNNER_TEMP:-/tmp}/docs-link-checker-http-${port}.log"
 
-          python3 -m http.server "$port" --bind 127.0.0.1 --directory "$source_dir" >/tmp/docs-link-checker-http.log 2>&1 &
+          python3 -m http.server "$port" --bind 127.0.0.1 --directory "$source_dir" >"$http_log" 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" >/dev/null 2>&1 || true' EXIT
           sleep 1

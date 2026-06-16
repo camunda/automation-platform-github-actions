@@ -8,9 +8,9 @@ This action is part of the docs release migration Phase 1 shared foundation for 
 
 Read-only parity search paths:
 
-- `/Users/oleksii/IdeaProjects/jenkins-job-dsl-seed-jobs`
-- `/Users/oleksii/IdeaProjects/cambpm-jenkins-shared-library`
-- `/Users/oleksii/IdeaProjects/infra-core`
+- `jenkins-job-dsl-seed-jobs`
+- `cambpm-jenkins-shared-library`
+- `infra-core`
 
 Findings:
 
