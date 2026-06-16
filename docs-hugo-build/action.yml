@@ -59,6 +59,7 @@ runs:
         esac
 
     - name: Install Hugo
+      id: install
       shell: bash
       env:
         INPUT_HUGO_VERSION: ${{ inputs.hugo-version }}
@@ -117,6 +118,7 @@ runs:
 
         release_api_url="https://api.github.com/repos/gohugoio/hugo/releases/tags/v${version}"
         release_json="$(mktemp)"
+        trap 'rm -f "$release_json"' EXIT
         curl_args=(-fsSL)
         if [[ -n "${GITHUB_TOKEN:-}" ]]; then
           curl_args+=(
@@ -174,6 +176,10 @@ runs:
           printf '%s\n' "$bin_dir" >> "$GITHUB_PATH"
         fi
 
+        if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+          printf 'hugo_bin=%s\n' "$bin_dir/hugo" >> "$GITHUB_OUTPUT"
+        fi
+
         "$bin_dir/hugo" version
 
     - name: Build docs with Hugo
@@ -182,19 +188,26 @@ runs:
         INPUT_SOURCE: ${{ inputs.source }}
         INPUT_DESTINATION: ${{ inputs.destination }}
         INPUT_EXTRA_ARGS: ${{ inputs.extra-args }}
+        HUGO_BIN: ${{ steps.install.outputs.hugo_bin }}
       run: |
         set -euo pipefail
 
         source_dir="$INPUT_SOURCE"
         destination_dir="$INPUT_DESTINATION"
         extra_args="$INPUT_EXTRA_ARGS"
+        hugo_bin="$HUGO_BIN"
 
-        if ! command -v hugo >/dev/null 2>&1; then
-          echo "hugo is not available on PATH" >&2
+        if [[ -z "$hugo_bin" ]]; then
+          echo "HUGO_BIN output is empty; Install Hugo step did not provide a binary path" >&2
           exit 1
         fi
 
-        hugo_cmd=(hugo --source "$source_dir")
+        if [[ ! -x "$hugo_bin" ]]; then
+          echo "Hugo binary is not executable: $hugo_bin" >&2
+          exit 1
+        fi
+
+        hugo_cmd=("$hugo_bin" --source "$source_dir")
 
         if [[ -n "$destination_dir" ]]; then
           if [[ "$destination_dir" == -* ]]; then
