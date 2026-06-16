@@ -31,7 +31,7 @@ runs:
           echo "Missing required input: source (or provide base-url)" >&2
           exit 1
         fi
-        if [[ -n "$INPUT_SOURCE" && ! -d "$INPUT_SOURCE" ]]; then
+        if [[ -z "$INPUT_BASE_URL" && ! -d "$INPUT_SOURCE" ]]; then
           echo "source directory does not exist: $INPUT_SOURCE" >&2
           exit 1
         fi
@@ -133,10 +133,10 @@ runs:
         if [[ -n "$base_url" ]]; then
           target_url="$base_url"
         else
-          port="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
+          port="$("$CHECKER_PYTHON" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
           http_log="${RUNNER_TEMP:-/tmp}/docs-link-checker-http-${port}.log"
 
-          python3 -m http.server "$port" --bind 127.0.0.1 --directory "$source_dir" >"$http_log" 2>&1 &
+          "$CHECKER_PYTHON" -m http.server "$port" --bind 127.0.0.1 --directory "$source_dir" >"$http_log" 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" >/dev/null 2>&1 || true' EXIT
           target_url="http://127.0.0.1:${port}"
@@ -150,7 +150,7 @@ runs:
               fi
               exit 1
             fi
-            if TARGET_URL="$target_url" python3 - <<'PY'
+            if TARGET_URL="$target_url" "$CHECKER_PYTHON" - <<'PY'
         import os
         import urllib.request
         import urllib.error
