@@ -63,6 +63,7 @@ runs:
       env:
         INPUT_HUGO_VERSION: ${{ inputs.hugo-version }}
         INPUT_EXTENDED: ${{ inputs.extended }}
+        GITHUB_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
 
@@ -100,7 +101,7 @@ runs:
           Darwin)
             case "$arch_name" in
               x86_64|amd64) preferred_suffixes=("darwin-universal" "darwin-amd64" "macOS-64bit") ;;
-              arm64|aarch64) preferred_suffixes=("darwin-universal" "darwin-arm64" "macOS-64bit") ;;
+              arm64|aarch64) preferred_suffixes=("darwin-universal" "darwin-arm64") ;;
               *)
                 echo "Unsupported runner architecture on Darwin: $arch_name" >&2
                 exit 1
