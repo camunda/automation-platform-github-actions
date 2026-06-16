@@ -127,7 +127,10 @@ runs:
           )
         fi
 
-        curl "${curl_args[@]}" "$release_api_url" -o "$release_json"
+        if ! curl "${curl_args[@]}" "$release_api_url" -o "$release_json"; then
+          echo "Failed to fetch Hugo release metadata from $release_api_url. Ensure tag v${version} exists and the workflow is not rate-limited." >&2
+          exit 1
+        fi
 
         archive_name="$({
           RELEASE_PREFIX="$release_prefix" \
@@ -170,6 +173,7 @@ runs:
         curl -fsSL "$archive_url" -o "$archive_path"
 
         tar -xzf "$archive_path" -C "$bin_dir" hugo
+        rm -f "$archive_path"
         chmod +x "$bin_dir/hugo"
 
         if [[ -n "${GITHUB_PATH:-}" ]]; then
