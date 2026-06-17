@@ -1,0 +1,279 @@
+name: "Docs Hugo build"
+description: "Build Hugo docs with a pinned Hugo version (default 0.54.0)"
+inputs:
+  source:
+    description: "Path to the Hugo site/project directory"
+    required: true
+  destination:
+    description: "Optional output directory passed to Hugo via --destination"
+    required: false
+  hugo-version:
+    description: "Hugo version to install"
+    required: false
+    default: "0.54.0"
+  extra-args:
+    description: "Extra arguments appended to the Hugo command"
+    required: false
+  extended:
+    description: "Install Hugo extended build (true or false)"
+    required: false
+    default: "false"
+runs:
+  using: "composite"
+  steps:
+    - name: Validate inputs
+      shell: bash
+      env:
+        INPUT_SOURCE: ${{ inputs.source }}
+        INPUT_DESTINATION: ${{ inputs.destination }}
+        INPUT_HUGO_VERSION: ${{ inputs.hugo-version }}
+        INPUT_EXTENDED: ${{ inputs.extended }}
+      run: |
+        set -euo pipefail
+
+        if [[ -z "$INPUT_SOURCE" ]]; then
+          echo "Missing required input: source" >&2
+          exit 1
+        fi
+        if [[ ! -d "$INPUT_SOURCE" ]]; then
+          echo "source directory does not exist: $INPUT_SOURCE" >&2
+          exit 1
+        fi
+
+        if [[ -n "$INPUT_DESTINATION" && "$INPUT_DESTINATION" == -* ]]; then
+          echo "destination must not start with '-'" >&2
+          exit 1
+        fi
+
+        if [[ ! "$INPUT_HUGO_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "Invalid hugo-version. Expected semantic version like 0.54.0" >&2
+          exit 1
+        fi
+
+        case "$INPUT_EXTENDED" in
+          true|false) ;;
+          *)
+            echo "Invalid extended value. Allowed values: true, false" >&2
+            exit 1
+            ;;
+        esac
+
+    - name: Install Hugo
+      id: install
+      shell: bash
+      env:
+        INPUT_HUGO_VERSION: ${{ inputs.hugo-version }}
+        INPUT_EXTENDED: ${{ inputs.extended }}
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+
+        version="$INPUT_HUGO_VERSION"
+        extended="$INPUT_EXTENDED"
+
+        os_name="$(uname -s)"
+        arch_name="$(uname -m)"
+
+        case "$os_name" in
+          Linux) ;;
+          Darwin) ;;
+          *)
+            echo "Unsupported runner OS: $os_name" >&2
+            exit 1
+            ;;
+        esac
+
+        release_prefix="hugo"
+        if [[ "$extended" == "true" ]]; then
+          release_prefix="hugo_extended"
+        fi
+
+        case "$os_name" in
+          Linux)
+            case "$arch_name" in
+              x86_64|amd64) preferred_suffixes=("linux-amd64" "Linux-64bit") ;;
+              arm64|aarch64) preferred_suffixes=("linux-arm64" "Linux-ARM64") ;;
+              *)
+                echo "Unsupported runner architecture on Linux: $arch_name" >&2
+                exit 1
+                ;;
+            esac
+            ;;
+          Darwin)
+            case "$arch_name" in
+              x86_64|amd64) preferred_suffixes=("darwin-universal" "darwin-amd64" "Darwin-64bit" "macOS-64bit") ;;
+              arm64|aarch64) preferred_suffixes=("darwin-universal" "darwin-arm64" "Darwin-ARM64") ;;
+              *)
+                echo "Unsupported runner architecture on Darwin: $arch_name" >&2
+                exit 1
+                ;;
+            esac
+            ;;
+        esac
+
+        if ! command -v ruby >/dev/null 2>&1; then
+          echo "ruby is required to parse GitHub release metadata" >&2
+          exit 1
+        fi
+
+        release_api_url="https://api.github.com/repos/gohugoio/hugo/releases/tags/v${version}"
+        release_json="$(mktemp)"
+        trap 'rm -f "$release_json"' EXIT
+        curl_args=(-fsSL)
+        if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+          curl_args+=(
+            -H "Authorization: Bearer ${GITHUB_TOKEN}"
+            -H "X-GitHub-Api-Version: 2022-11-28"
+          )
+        fi
+
+        if ! curl "${curl_args[@]}" --retry 3 --retry-delay 2 "$release_api_url" -o "$release_json"; then
+          echo "Failed to fetch Hugo release metadata from $release_api_url. Ensure tag v${version} exists and the workflow is not rate-limited." >&2
+          exit 1
+        fi
+
+        archive_name="$({
+          RELEASE_PREFIX="$release_prefix" \
+          VERSION="$version" \
+          PREFERRED_SUFFIXES="$(IFS=:; echo "${preferred_suffixes[*]}")" \
+          ruby -rjson -e '
+            payload = JSON.parse(File.read(ARGV.fetch(0)))
+            prefix = ENV.fetch("RELEASE_PREFIX")
+            suffixes = ENV.fetch("PREFERRED_SUFFIXES").split(":")
+            asset_names = payload.fetch("assets").map { |a| a.fetch("name") }
+
+            selected = nil
+            suffixes.each do |suffix|
+              candidate = asset_names.find { |n| n == "#{prefix}_#{ENV.fetch("VERSION")}_#{suffix}.tar.gz" }
+              if candidate
+                selected = candidate
+                break
+              end
+            end
+
+            if selected.nil?
+              STDERR.puts "No matching Hugo archive found for version #{ENV.fetch("VERSION")} with prefix #{prefix}"
+              STDERR.puts "Available archives:"
+              asset_names.grep(/\.tar\.gz\z/).each { |n| STDERR.puts "  - #{n}" }
+              exit 1
+            end
+
+            puts selected
+          ' "$release_json"
+        })"
+
+        archive_url="https://github.com/gohugoio/hugo/releases/download/v${version}/${archive_name}"
+        checksums_url="https://github.com/gohugoio/hugo/releases/download/v${version}/hugo_${version}_checksums.txt"
+
+        install_root="${RUNNER_TEMP:-$(mktemp -d)}/docs-hugo-build-${version}"
+        bin_dir="$install_root/bin"
+        archive_path="$install_root/$archive_name"
+        checksums_path="$install_root/hugo_${version}_checksums.txt"
+
+        mkdir -p "$bin_dir"
+
+        if ! curl -fsSL --retry 3 --retry-delay 2 "$archive_url" -o "$archive_path"; then
+          echo "Failed to fetch Hugo archive from $archive_url" >&2
+          exit 1
+        fi
+
+        if ! curl -fsSL --retry 3 --retry-delay 2 "$checksums_url" -o "$checksums_path"; then
+          echo "Failed to fetch Hugo checksums from $checksums_url" >&2
+          exit 1
+        fi
+
+        checksum_line="$(grep -F "  $archive_name" "$checksums_path" | head -n 1 || true)"
+        if [[ -z "$checksum_line" ]]; then
+          echo "No checksum entry found for ${archive_name} in ${checksums_url}" >&2
+          exit 1
+        fi
+
+        (
+          cd "$install_root"
+          if command -v sha256sum >/dev/null 2>&1; then
+            printf '%s\n' "$checksum_line" | sha256sum -c -
+          elif command -v shasum >/dev/null 2>&1; then
+            printf '%s\n' "$checksum_line" | shasum -a 256 -c -
+          else
+            echo "sha256sum or shasum is required to verify Hugo archive checksum" >&2
+            exit 1
+          fi
+        )
+
+        rm -f "$checksums_path"
+
+        tar -xzf "$archive_path" -C "$bin_dir" hugo
+        rm -f "$archive_path"
+        chmod +x "$bin_dir/hugo"
+
+        if [[ -n "${GITHUB_PATH:-}" ]]; then
+          printf '%s\n' "$bin_dir" >> "$GITHUB_PATH"
+        fi
+
+        if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+          printf 'hugo_bin=%s\n' "$bin_dir/hugo" >> "$GITHUB_OUTPUT"
+        fi
+
+        "$bin_dir/hugo" version
+
+    - name: Build docs with Hugo
+      shell: bash
+      env:
+        INPUT_SOURCE: ${{ inputs.source }}
+        INPUT_DESTINATION: ${{ inputs.destination }}
+        INPUT_EXTRA_ARGS: ${{ inputs.extra-args }}
+        HUGO_BIN: ${{ steps.install.outputs.hugo_bin }}
+      run: |
+        set -euo pipefail
+
+        source_dir="$INPUT_SOURCE"
+        destination_dir="$INPUT_DESTINATION"
+        extra_args="$INPUT_EXTRA_ARGS"
+        hugo_bin="$HUGO_BIN"
+
+        if [[ -z "$hugo_bin" ]]; then
+          echo "HUGO_BIN output is empty; Install Hugo step did not provide a binary path" >&2
+          exit 1
+        fi
+
+        if [[ ! -x "$hugo_bin" ]]; then
+          echo "Hugo binary is not executable: $hugo_bin" >&2
+          exit 1
+        fi
+
+        hugo_cmd=("$hugo_bin")
+
+        if [[ -n "$extra_args" ]]; then
+          # extra-args are split by shell words; quoted groups inside the string are not preserved.
+          set -f
+          # shellcheck disable=SC2206
+          extra_args_array=( $extra_args )
+          set +f
+
+          for arg in "${extra_args_array[@]}"; do
+            case "$arg" in
+              --source|-s|--source=*|-s=*|--destination|-d|--destination=*|-d=*)
+                echo "extra-args must not override source or destination" >&2
+                exit 1
+                ;;
+              server)
+                echo "extra-args must not include Hugo subcommand 'server'" >&2
+                exit 1
+                ;;
+            esac
+          done
+
+          hugo_cmd+=("${extra_args_array[@]}")
+        fi
+
+        hugo_cmd+=(--source "$source_dir")
+
+        if [[ -n "$destination_dir" ]]; then
+          if [[ "$destination_dir" == -* ]]; then
+            echo "destination must not start with '-'" >&2
+            exit 1
+          fi
+          hugo_cmd+=(--destination "$destination_dir")
+        fi
+
+        "${hugo_cmd[@]}"
