@@ -1,0 +1,240 @@
+name: "Docs link checker"
+description: "Run deterministic docs link checks with pyLinkValidator"
+inputs:
+  source:
+    description: "Path to built docs/output directory to check (required when base-url is not provided)"
+    required: false
+  base-url:
+    description: "Optional base URL to check instead of serving the local source directory"
+    required: false
+  ignore-regex:
+    description: "Optional Python regex matched via re.match against each broken URL path"
+    required: false
+  pylinkvalidator-version:
+    description: "pyLinkValidator version to install"
+    required: false
+    default: "0.3"
+runs:
+  using: "composite"
+  steps:
+    - name: Validate inputs
+      shell: bash
+      env:
+        INPUT_SOURCE: ${{ inputs.source }}
+        INPUT_BASE_URL: ${{ inputs.base-url }}
+        INPUT_IGNORE_REGEX: ${{ inputs.ignore-regex }}
+        INPUT_PYLINKVALIDATOR_VERSION: ${{ inputs.pylinkvalidator-version }}
+      run: |
+        set -euo pipefail
+
+        if [[ -z "$INPUT_SOURCE" && -z "$INPUT_BASE_URL" ]]; then
+          echo "Missing required input: source (or provide base-url)" >&2
+          exit 1
+        fi
+        if [[ -z "$INPUT_BASE_URL" && ! -d "$INPUT_SOURCE" ]]; then
+          echo "source directory does not exist: $INPUT_SOURCE" >&2
+          exit 1
+        fi
+
+        if [[ -n "$INPUT_BASE_URL" && ! "$INPUT_BASE_URL" =~ ^https?://[^[:space:]]+$ ]]; then
+          echo "Invalid base-url. Expected http(s)://..." >&2
+          exit 1
+        fi
+
+        if [[ ! "$INPUT_PYLINKVALIDATOR_VERSION" =~ ^[0-9]+(\.[0-9]+){1,2}$ ]]; then
+          echo "Invalid pylinkvalidator-version. Expected numeric version such as 0.3" >&2
+          exit 1
+        fi
+
+        if [[ -n "$INPUT_IGNORE_REGEX" ]]; then
+          if ! command -v python3 >/dev/null 2>&1; then
+            echo "python3 is required to validate ignore-regex but is not available on PATH" >&2
+            exit 1
+          fi
+          if ! IGNORE_REGEX="$INPUT_IGNORE_REGEX" python3 - <<'PY'
+        import os
+        import re
+        import sys
+
+        try:
+            re.compile(os.environ["IGNORE_REGEX"])
+        except re.error as exc:
+            print(f"invalid ignore-regex: {exc}", file=sys.stderr)
+            raise SystemExit(1)
+        PY
+          then
+            exit 1
+          fi
+        fi
+
+    - name: Install pyLinkValidator
+      id: install
+      shell: bash
+      env:
+        INPUT_PYLINKVALIDATOR_VERSION: ${{ inputs.pylinkvalidator-version }}
+      run: |
+        set -euo pipefail
+
+        python_bin="python3"
+        if ! command -v "$python_bin" >/dev/null 2>&1; then
+          echo "python3 is required but not available on PATH" >&2
+          exit 1
+        fi
+
+        venv_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/docs-link-checker-venv-${INPUT_PYLINKVALIDATOR_VERSION}-XXXXXXXX")"
+        "$python_bin" -m venv "$venv_dir"
+
+        if [[ -f "$venv_dir/bin/python" ]]; then
+          checker_python="$venv_dir/bin/python"
+        elif [[ -f "$venv_dir/Scripts/python.exe" ]]; then
+          checker_python="$venv_dir/Scripts/python.exe"
+        else
+          echo "Unable to locate virtualenv Python interpreter under: $venv_dir" >&2
+          exit 1
+        fi
+
+        "$checker_python" -m pip --disable-pip-version-check --no-input install "soupsieve==2.2.1" "beautifulsoup4==4.12.3" "pyLinkValidator==${INPUT_PYLINKVALIDATOR_VERSION}"
+
+        "$checker_python" - <<'PY'
+        from pylinkvalidator.api import crawl
+
+        print("pylinkvalidator API import OK")
+        PY
+
+        {
+          echo "venv_dir=$venv_dir"
+          echo "checker_python=$checker_python"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Run link check
+      shell: bash
+      env:
+        INPUT_SOURCE: ${{ inputs.source }}
+        INPUT_BASE_URL: ${{ inputs.base-url }}
+        INPUT_IGNORE_REGEX: ${{ inputs.ignore-regex }}
+        CHECKER_PYTHON: ${{ steps.install.outputs.checker_python }}
+      run: |
+        set -euo pipefail
+
+        source_dir="$INPUT_SOURCE"
+        base_url="$INPUT_BASE_URL"
+        ignore_regex="$INPUT_IGNORE_REGEX"
+
+        if [[ ! -f "$CHECKER_PYTHON" ]]; then
+          echo "checker python does not exist: $CHECKER_PYTHON" >&2
+          exit 1
+        fi
+        if ! checker_python_invocation="$("$CHECKER_PYTHON" -c 'import sys; print(sys.executable)' 2>&1)"; then
+          echo "checker python could not be invoked: $CHECKER_PYTHON" >&2
+          echo "$checker_python_invocation" >&2
+          exit 1
+        fi
+
+        if [[ -n "$base_url" ]]; then
+          target_url="$base_url"
+        else
+          port="$("$CHECKER_PYTHON" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
+          http_log="${RUNNER_TEMP:-/tmp}/docs-link-checker-http-${port}.log"
+
+          "$CHECKER_PYTHON" -m http.server "$port" --bind 127.0.0.1 --directory "$source_dir" >"$http_log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" >/dev/null 2>&1 || true' EXIT
+          target_url="http://127.0.0.1:${port}"
+
+          server_ready=0
+          for ((_attempt=1; _attempt<=10; _attempt++)); do
+            if ! kill -0 "$server_pid" >/dev/null 2>&1; then
+              echo "local HTTP server exited before becoming ready; log: $http_log" >&2
+              if [[ -f "$http_log" ]]; then
+                cat "$http_log" >&2
+              fi
+              exit 1
+            fi
+            if TARGET_URL="$target_url" "$CHECKER_PYTHON" - <<'PY'
+        import os
+        import urllib.request
+        import urllib.error
+
+        try:
+            with urllib.request.urlopen(os.environ["TARGET_URL"], timeout=1) as response:
+                if response.status >= 400:
+                    raise SystemExit(1)
+        except (urllib.error.URLError, TimeoutError, OSError):
+            raise SystemExit(1)
+        PY
+            then
+              server_ready=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [[ "$server_ready" -ne 1 ]]; then
+            echo "local HTTP server did not become ready in time; log: $http_log" >&2
+            if [[ -f "$http_log" ]]; then
+              cat "$http_log" >&2
+            fi
+            exit 1
+          fi
+        fi
+
+        TARGET_URL="$target_url" IGNORE_REGEX="$ignore_regex" "$CHECKER_PYTHON" - <<'PY'
+        import os
+        import re
+        import sys
+        from urllib.parse import urlparse
+
+        from pylinkvalidator.api import crawl
+
+        target_url = os.environ["TARGET_URL"]
+        ignore_regex = os.environ.get("IGNORE_REGEX", "")
+
+        compiled_regex = re.compile(ignore_regex) if ignore_regex else None
+        crawled_site = crawl(target_url)
+
+        def broken_path(page_key):
+            path = getattr(page_key, "path", "")
+            if path:
+                return path
+            parsed = urlparse(str(page_key))
+            return parsed.path or str(page_key)
+
+        ignored = []
+        non_ignored = []
+        for page_key, page_item in crawled_site.error_pages.items():
+            path = broken_path(page_key)
+            if compiled_regex and compiled_regex.match(path):
+                ignored.append((page_key, page_item, path))
+            else:
+                non_ignored.append((page_key, page_item, path))
+
+        print("Checked {} links, {} broken, {} ignored, {} failing.".format(
+            len(crawled_site.pages.items()),
+            len(crawled_site.error_pages.items()),
+            len(ignored),
+            len(non_ignored),
+        ))
+
+        if ignored:
+            print("Ignored broken links (matched ignore-regex):")
+            for page_key, _page_item, path in ignored:
+                print("  - {} (path: {})".format(page_key, path))
+
+        if non_ignored:
+            print("Failing broken links:")
+            for page_key, page_item, _path in non_ignored:
+                print(page_item)
+                print("  Linked from:")
+                page_obj = crawled_site.pages.get(page_key)
+                source_descriptions = []
+                if page_obj is not None:
+                    source_descriptions = [
+                        source.origin.scheme + "://" + source.origin.netloc + source.origin.path + "(" + source.origin_str + ")"
+                        for source in page_obj.sources
+                    ]
+                for source_description in sorted(set(source_descriptions)):
+                    print(source_description)
+            sys.exit(1)
+
+        sys.exit(0)
+        PY
