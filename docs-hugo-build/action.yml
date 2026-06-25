@@ -111,8 +111,8 @@ runs:
             ;;
         esac
 
-        if ! command -v ruby >/dev/null 2>&1; then
-          echo "ruby is required to parse GitHub release metadata" >&2
+        if ! command -v node >/dev/null 2>&1; then
+          echo "node is required to parse GitHub release metadata" >&2
           exit 1
         fi
 
@@ -136,32 +136,37 @@ runs:
           RELEASE_PREFIX="$release_prefix" \
           VERSION="$version" \
           PREFERRED_SUFFIXES="$(IFS=:; echo "${preferred_suffixes[*]}")" \
-          ruby -rjson -e '
-            payload = JSON.parse(File.read(ARGV.fetch(0)))
-            prefix = ENV.fetch("RELEASE_PREFIX")
-            suffixes = ENV.fetch("PREFERRED_SUFFIXES").split(":")
-            asset_names = payload.fetch("assets").map { |a| a.fetch("name") }
+          node -e '
+            const fs = require("fs");
+            const releaseJsonPath = process.argv[1];
+            const payload = JSON.parse(fs.readFileSync(releaseJsonPath, "utf8"));
+            const prefix = process.env.RELEASE_PREFIX;
+            const version = process.env.VERSION;
+            const suffixes = process.env.PREFERRED_SUFFIXES.split(":");
+            const assetNames = payload.assets.map((asset) => asset.name);
 
-            selected = nil
-            suffixes.each do |suffix|
-              candidate = asset_names.find { |n| n == "#{prefix}_#{ENV.fetch("VERSION")}_#{suffix}.tar.gz" }
-              if candidate
-                selected = candidate
-                break
-              end
-            end
+            let selected = null;
+            for (const suffix of suffixes) {
+              const candidate = `${prefix}_${version}_${suffix}.tar.gz`;
+              if (assetNames.includes(candidate)) {
+                selected = candidate;
+                break;
+              }
+            }
 
-            if selected.nil?
-              STDERR.puts "No matching Hugo archive found for version #{ENV.fetch("VERSION")} with prefix #{prefix}"
-              STDERR.puts "Available archives:"
-              asset_names.grep(/\.tar\.gz\z/).each { |n| STDERR.puts "  - #{n}" }
-              exit 1
-            end
+            if (!selected) {
+              console.error(`No matching Hugo archive found for version ${version}`);
+              console.error(`Selected prefix: ${prefix}`);
+              console.error("Available .tar.gz archives:");
+              for (const name of assetNames.filter((name) => name.endsWith(".tar.gz"))) {
+                console.error(`  - ${name}`);
+              }
+              process.exit(1);
+            }
 
-            puts selected
+            console.log(selected);
           ' "$release_json"
         })"
-
         archive_url="https://github.com/gohugoio/hugo/releases/download/v${version}/${archive_name}"
         checksums_url="https://github.com/gohugoio/hugo/releases/download/v${version}/hugo_${version}_checksums.txt"
 

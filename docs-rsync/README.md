@@ -67,7 +67,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Stage docs
-        uses: camunda/automation-platform-github-actions/docs-rsync@main
+        uses: camunda/automation-platform-github-actions/docs-rsync@<commit-sha-or-version-tag>
         with:
           mode: stage
           source: ./dist/docs
@@ -81,7 +81,7 @@ jobs:
           live-root: ${{ vars.DOCS_LIVE_ROOT }}
 
       - name: Promote docs to live
-        uses: camunda/automation-platform-github-actions/docs-rsync@main
+        uses: camunda/automation-platform-github-actions/docs-rsync@<commit-sha-or-version-tag>
         with:
           mode: live
           folder: manual/1.2
