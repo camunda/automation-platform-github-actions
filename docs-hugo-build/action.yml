@@ -64,11 +64,12 @@ runs:
       env:
         INPUT_HUGO_VERSION: ${{ inputs.hugo-version }}
         INPUT_EXTENDED: ${{ inputs.extended }}
-        GITHUB_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
 
         version="$INPUT_HUGO_VERSION"
+        checksums_url="https://github.com/gohugoio/hugo/releases/download/v${version}/hugo_${version}_checksums.txt"
+
         extended="$INPUT_EXTENDED"
 
         os_name="$(uname -s)"
@@ -111,116 +112,56 @@ runs:
             ;;
         esac
 
-        if ! command -v node >/dev/null 2>&1; then
-          echo "node is required to parse GitHub release metadata" >&2
-          exit 1
-        fi
-
-        release_api_url="https://api.github.com/repos/gohugoio/hugo/releases/tags/v${version}"
-        release_json="$(mktemp)"
-        trap 'rm -f "$release_json"' EXIT
-        curl_args=(-fsSL)
-        if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-          curl_args+=(
-            -H "Authorization: Bearer ${GITHUB_TOKEN}"
-            -H "X-GitHub-Api-Version: 2022-11-28"
-          )
-        fi
-
-        if ! curl "${curl_args[@]}" --retry 3 --retry-delay 2 "$release_api_url" -o "$release_json"; then
-          echo "Failed to fetch Hugo release metadata from $release_api_url. Ensure tag v${version} exists and the workflow is not rate-limited." >&2
-          exit 1
-        fi
-
-        archive_name="$({
-          RELEASE_PREFIX="$release_prefix" \
-          RELEASE_JSON_PATH="$release_json" \
-          VERSION="$version" \
-          PREFERRED_SUFFIXES="$(IFS=:; echo "${preferred_suffixes[*]}")" \
-          node -e '
-            const fs = require("fs");
-            const releaseJsonPath = process.env.RELEASE_JSON_PATH;
-            if (!releaseJsonPath) {
-              console.error("Missing RELEASE_JSON_PATH");
-              process.exit(1);
-            }
-            let payload;
-            try {
-              payload = JSON.parse(fs.readFileSync(releaseJsonPath, "utf8"));
-            } catch (err) {
-              const message = err && err.message ? err.message : String(err);
-              console.error(`Failed to parse release metadata JSON at ${releaseJsonPath}: ${message}`);
-              process.exit(1);
-            }
-            const prefix = process.env.RELEASE_PREFIX;
-            const version = process.env.VERSION;
-            const preferredSuffixes = process.env.PREFERRED_SUFFIXES;
-
-            if (!prefix) {
-              console.error("Missing RELEASE_PREFIX");
-              process.exit(1);
-            }
-            if (!version) {
-              console.error("Missing VERSION");
-              process.exit(1);
-            }
-            if (!preferredSuffixes) {
-              console.error("Missing PREFERRED_SUFFIXES");
-              process.exit(1);
-            }
-            if (!payload || !Array.isArray(payload.assets)) {
-              console.error("Invalid release metadata: missing assets array");
-              process.exit(1);
-            }
-
-            const suffixes = preferredSuffixes.split(":");
-            const assetNames = payload.assets.map((asset) => asset.name);
-
-            let selected = null;
-            for (const suffix of suffixes) {
-              const candidate = `${prefix}_${version}_${suffix}.tar.gz`;
-              if (assetNames.includes(candidate)) {
-                selected = candidate;
-                break;
-              }
-            }
-
-            if (!selected) {
-              console.error(`No matching Hugo archive found for version ${version}`);
-              console.error(`Selected prefix: ${prefix}`);
-              console.error("Available .tar.gz archives:");
-              for (const name of assetNames.filter((name) => name.endsWith(".tar.gz"))) {
-                console.error(`  - ${name}`);
-              }
-              process.exit(1);
-            }
-
-            console.log(selected);
-          '
-        })"
-        archive_url="https://github.com/gohugoio/hugo/releases/download/v${version}/${archive_name}"
-        checksums_url="https://github.com/gohugoio/hugo/releases/download/v${version}/hugo_${version}_checksums.txt"
-
         install_root="${RUNNER_TEMP:-$(mktemp -d)}/docs-hugo-build-${version}"
         bin_dir="$install_root/bin"
-        archive_path="$install_root/$archive_name"
         checksums_path="$install_root/hugo_${version}_checksums.txt"
 
         mkdir -p "$bin_dir"
-
-        if ! curl -fsSL --retry 3 --retry-delay 2 "$archive_url" -o "$archive_path"; then
-          echo "Failed to fetch Hugo archive from $archive_url" >&2
-          exit 1
-        fi
 
         if ! curl -fsSL --retry 3 --retry-delay 2 "$checksums_url" -o "$checksums_path"; then
           echo "Failed to fetch Hugo checksums from $checksums_url" >&2
           exit 1
         fi
 
-        checksum_line="$(grep -F "  $archive_name" "$checksums_path" | head -n 1 || true)"
-        if [[ -z "$checksum_line" ]]; then
-          echo "No checksum entry found for ${archive_name} in ${checksums_url}" >&2
+        archive_name=""
+        checksum_line=""
+        for suffix in "${preferred_suffixes[@]}"; do
+          candidate="${release_prefix}_${version}_${suffix}.tar.gz"
+          while IFS= read -r line; do
+            case "$line" in
+              *"  $candidate")
+                archive_name="$candidate"
+                checksum_line="$line"
+                break
+                ;;
+            esac
+          done < "$checksums_path"
+          if [[ -n "$archive_name" ]]; then
+            break
+          fi
+        done
+
+        if [[ -z "$archive_name" || -z "$checksum_line" ]]; then
+          echo "No matching Hugo archive found in published checksums." >&2
+          echo "Hugo version: $version" >&2
+          echo "Release prefix: $release_prefix" >&2
+          echo "Preferred suffixes: ${preferred_suffixes[*]}" >&2
+          echo "Available .tar.gz archives:" >&2
+          while IFS= read -r line; do
+            case "$line" in
+              *".tar.gz")
+                printf '  - %s\n' "${line##*  }" >&2
+                ;;
+            esac
+          done < "$checksums_path"
+          exit 1
+        fi
+
+        archive_url="https://github.com/gohugoio/hugo/releases/download/v${version}/${archive_name}"
+        archive_path="$install_root/$archive_name"
+
+        if ! curl -fsSL --retry 3 --retry-delay 2 "$archive_url" -o "$archive_path"; then
+          echo "Failed to fetch Hugo archive from $archive_url" >&2
           exit 1
         fi
 
