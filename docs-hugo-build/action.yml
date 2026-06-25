@@ -147,7 +147,26 @@ runs:
             const payload = JSON.parse(fs.readFileSync(releaseJsonPath, "utf8"));
             const prefix = process.env.RELEASE_PREFIX;
             const version = process.env.VERSION;
-            const suffixes = process.env.PREFERRED_SUFFIXES.split(":");
+            const preferredSuffixes = process.env.PREFERRED_SUFFIXES;
+
+            if (!prefix) {
+              console.error("Missing RELEASE_PREFIX");
+              process.exit(1);
+            }
+            if (!version) {
+              console.error("Missing VERSION");
+              process.exit(1);
+            }
+            if (!preferredSuffixes) {
+              console.error("Missing PREFERRED_SUFFIXES");
+              process.exit(1);
+            }
+            if (!payload || !Array.isArray(payload.assets)) {
+              console.error("Invalid release metadata: missing assets array");
+              process.exit(1);
+            }
+
+            const suffixes = preferredSuffixes.split(":");
             const assetNames = payload.assets.map((asset) => asset.name);
 
             let selected = null;
