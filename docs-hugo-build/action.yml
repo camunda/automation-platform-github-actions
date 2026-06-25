@@ -144,7 +144,14 @@ runs:
               console.error("Missing RELEASE_JSON_PATH");
               process.exit(1);
             }
-            const payload = JSON.parse(fs.readFileSync(releaseJsonPath, "utf8"));
+            let payload;
+            try {
+              payload = JSON.parse(fs.readFileSync(releaseJsonPath, "utf8"));
+            } catch (err) {
+              const message = err && err.message ? err.message : String(err);
+              console.error(`Failed to parse release metadata JSON at ${releaseJsonPath}: ${message}`);
+              process.exit(1);
+            }
             const prefix = process.env.RELEASE_PREFIX;
             const version = process.env.VERSION;
             const preferredSuffixes = process.env.PREFERRED_SUFFIXES;
