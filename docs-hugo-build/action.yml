@@ -134,11 +134,16 @@ runs:
 
         archive_name="$({
           RELEASE_PREFIX="$release_prefix" \
+          RELEASE_JSON_PATH="$release_json" \
           VERSION="$version" \
           PREFERRED_SUFFIXES="$(IFS=:; echo "${preferred_suffixes[*]}")" \
           node -e '
             const fs = require("fs");
-            const releaseJsonPath = process.argv[1];
+            const releaseJsonPath = process.env.RELEASE_JSON_PATH;
+            if (!releaseJsonPath) {
+              console.error("Missing RELEASE_JSON_PATH");
+              process.exit(1);
+            }
             const payload = JSON.parse(fs.readFileSync(releaseJsonPath, "utf8"));
             const prefix = process.env.RELEASE_PREFIX;
             const version = process.env.VERSION;
@@ -165,7 +170,7 @@ runs:
             }
 
             console.log(selected);
-          ' "$release_json"
+          '
         })"
         archive_url="https://github.com/gohugoio/hugo/releases/download/v${version}/${archive_name}"
         checksums_url="https://github.com/gohugoio/hugo/releases/download/v${version}/hugo_${version}_checksums.txt"
