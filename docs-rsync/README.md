@@ -12,6 +12,14 @@ This action is intentionally infrastructure-agnostic. It does not hardcode hostn
 - `dry-run` must be `true` or `false` and defaults to `true`
 - Remote changes happen only when `dry-run` is explicitly set to `false`
 
+## Runner requirements
+
+The runner is expected to provide standard tools used by the action:
+
+- `bash`
+- `ssh`
+- `rsync`
+
 ## Inputs
 
 | Input | Required | Default | Description |

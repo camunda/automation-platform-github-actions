@@ -60,6 +60,15 @@ runs:
         stage_root="$INPUT_STAGE_ROOT"
         live_root="$INPUT_LIVE_ROOT"
 
+        if ! command -v rsync >/dev/null 2>&1; then
+          echo "rsync is required by docs-rsync but was not found on the runner" >&2
+          exit 1
+        fi
+        if ! command -v ssh >/dev/null 2>&1; then
+          echo "ssh is required by docs-rsync but was not found on the runner" >&2
+          exit 1
+        fi
+
         case "$mode" in
           stage|live) ;;
           *)
