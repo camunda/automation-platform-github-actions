@@ -12,6 +12,14 @@ This action is intentionally infrastructure-agnostic. It does not hardcode hostn
 - `dry-run` must be `true` or `false` and defaults to `true`
 - Remote changes happen only when `dry-run` is explicitly set to `false`
 
+## Runner requirements
+
+The runner is expected to provide standard tools used by the action:
+
+- `bash`
+- `ssh`
+- `rsync`
+
 ## Inputs
 
 | Input | Required | Default | Description |
@@ -67,7 +75,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Stage docs
-        uses: camunda/automation-platform-github-actions/docs-rsync@main
+        uses: camunda/automation-platform-github-actions/docs-rsync@<commit-sha-or-version-tag>
         with:
           mode: stage
           source: ./dist/docs
@@ -81,7 +89,7 @@ jobs:
           live-root: ${{ vars.DOCS_LIVE_ROOT }}
 
       - name: Promote docs to live
-        uses: camunda/automation-platform-github-actions/docs-rsync@main
+        uses: camunda/automation-platform-github-actions/docs-rsync@<commit-sha-or-version-tag>
         with:
           mode: live
           folder: manual/1.2
