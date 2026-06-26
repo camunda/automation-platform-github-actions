@@ -60,4 +60,4 @@ jobs:
 - Override `hugo-version` only when migration requirements allow it.
 - This action does not publish artifacts and does not perform remote operations.
 - Release workflows should pin this action to a commit SHA or version tag (avoid `@main`).
-- The runner is expected to provide standard tools used by the action: `bash`, `curl`, `tar`, `grep`, and either `sha256sum` or `shasum`.
+- The runner is expected to provide standard tools used by the action: `bash`, `curl`, `tar`, and either `sha256sum` or `shasum`.
