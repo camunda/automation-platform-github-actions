@@ -17,6 +17,13 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Provision Python 3.11
+      id: setup-python
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+      with:
+        python-version: "3.11"
+        update-environment: false
+
     - name: Validate inputs
       shell: bash
       env:
@@ -24,8 +31,16 @@ runs:
         INPUT_BASE_URL: ${{ inputs.base-url }}
         INPUT_IGNORE_REGEX: ${{ inputs.ignore-regex }}
         INPUT_PYLINKVALIDATOR_VERSION: ${{ inputs.pylinkvalidator-version }}
+        PROVISIONED_PYTHON: ${{ steps.setup-python.outputs.python-path }}
       run: |
         set -euo pipefail
+
+        if ! python_version="$("$PROVISIONED_PYTHON" --version 2>&1)"; then
+          echo "Python setup failure: provisioned interpreter could not be invoked." >&2
+          echo "$python_version" >&2
+          exit 1
+        fi
+        echo "Using $python_version"
 
         if [[ -z "$INPUT_SOURCE" && -z "$INPUT_BASE_URL" ]]; then
           echo "Missing required input: source (or provide base-url)" >&2
@@ -47,11 +62,7 @@ runs:
         fi
 
         if [[ -n "$INPUT_IGNORE_REGEX" ]]; then
-          if ! command -v python3 >/dev/null 2>&1; then
-            echo "python3 is required to validate ignore-regex but is not available on PATH" >&2
-            exit 1
-          fi
-          if ! IGNORE_REGEX="$INPUT_IGNORE_REGEX" python3 - <<'PY'
+          if ! IGNORE_REGEX="$INPUT_IGNORE_REGEX" "$PROVISIONED_PYTHON" - <<'PY'
         import os
         import re
         import sys
@@ -72,17 +83,16 @@ runs:
       shell: bash
       env:
         INPUT_PYLINKVALIDATOR_VERSION: ${{ inputs.pylinkvalidator-version }}
+        PROVISIONED_PYTHON: ${{ steps.setup-python.outputs.python-path }}
       run: |
         set -euo pipefail
 
-        python_bin="python3"
-        if ! command -v "$python_bin" >/dev/null 2>&1; then
-          echo "python3 is required but not available on PATH" >&2
+        venv_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/docs-link-checker-venv-${INPUT_PYLINKVALIDATOR_VERSION}-XXXXXXXX")"
+        if ! venv_output="$("$PROVISIONED_PYTHON" -m venv "$venv_dir" 2>&1)"; then
+          echo "Virtual-environment creation failure: could not create an isolated environment at: $venv_dir" >&2
+          echo "$venv_output" >&2
           exit 1
         fi
-
-        venv_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/docs-link-checker-venv-${INPUT_PYLINKVALIDATOR_VERSION}-XXXXXXXX")"
-        "$python_bin" -m venv "$venv_dir"
 
         if [[ -f "$venv_dir/bin/python" ]]; then
           checker_python="$venv_dir/bin/python"
@@ -93,13 +103,29 @@ runs:
           exit 1
         fi
 
-        "$checker_python" -m pip --disable-pip-version-check --no-input install "soupsieve==2.2.1" "beautifulsoup4==4.12.3" "pyLinkValidator==${INPUT_PYLINKVALIDATOR_VERSION}"
+        if ! pip_output="$("$checker_python" -m pip --version 2>&1)"; then
+          echo "Missing pip in the created environment: $venv_dir" >&2
+          echo "$pip_output" >&2
+          exit 1
+        fi
 
-        "$checker_python" - <<'PY'
+        if ! install_output="$("$checker_python" -m pip --disable-pip-version-check --no-input install "soupsieve==2.2.1" "beautifulsoup4==4.12.3" "pyLinkValidator==${INPUT_PYLINKVALIDATOR_VERSION}" 2>&1)"; then
+          echo "Dependency installation failure: could not install pyLinkValidator and its pinned dependencies." >&2
+          echo "$install_output" >&2
+          exit 1
+        fi
+
+        if ! import_output="$("$checker_python" - 2>&1 <<'PY'
         from pylinkvalidator.api import crawl
 
         print("pylinkvalidator API import OK")
         PY
+        )"; then
+          echo "Dependency installation failure: pylinkvalidator API import verification failed." >&2
+          echo "$import_output" >&2
+          exit 1
+        fi
+        echo "$import_output"
 
         {
           echo "venv_dir=$venv_dir"
