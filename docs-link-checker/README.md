@@ -22,7 +22,7 @@ Findings:
 
 ## Runtime and runner requirements
 
-The action requests Python **3.11** through `actions/setup-python` using semantic version matching. `actions/setup-python` selects the exact installed Python patch version; this action does not pin that patch release. The setup action itself is pinned to a full immutable commit SHA.
+The action requests Python **3.11** through `actions/setup-python` using semantic version matching. `actions/setup-python` selects the exact installed Python patch version, configures the runtime environment required to execute that provisioned interpreter, and is itself pinned to a full immutable commit SHA. This action does not pin the Python patch release.
 
 The action does not depend on the runner's ambient Python, `venv`, `ensurepip`, or pip. `pyLinkValidator==0.3`, `beautifulsoup4==4.12.3`, and `soupsieve==2.2.1` remain pinned and are installed in a newly created isolated virtual environment for every action run. The provisioned interpreter is used for regex validation, virtual-environment creation, package installation and verification, local HTTP serving, and crawling.
 
