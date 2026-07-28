@@ -1,0 +1,55 @@
+name: docs-link-checker validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-sites:
+    name: validate local-site link checking
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Create valid local site
+        run: |
+          mkdir -p test-sites/valid
+          printf '<a href="/about.html">About</a>\n' > test-sites/valid/index.html
+          printf '<p>About</p>\n' > test-sites/valid/about.html
+
+      - name: Check valid local site
+        uses: ./docs-link-checker
+        with:
+          source: test-sites/valid
+
+      - name: Create site with broken link
+        run: |
+          mkdir -p test-sites/broken
+          printf '<a href="/missing.html">Missing</a>\n' > test-sites/broken/index.html
+
+      - name: Check broken local site
+        id: broken_link_check
+        continue-on-error: true
+        uses: ./docs-link-checker
+        with:
+          source: test-sites/broken
+
+      - name: Verify broken link failed
+        if: ${{ steps.broken_link_check.outcome != 'failure' }}
+        run: |
+          echo "Expected the link checker to fail for a broken link." >&2
+          exit 1
+
+      - name: Create site with ignored broken link
+        run: |
+          mkdir -p test-sites/ignored
+          printf '<a href="/ignored-missing.html">Ignored missing page</a>\n' > test-sites/ignored/index.html
+
+      - name: Check ignored broken local site
+        uses: ./docs-link-checker
+        with:
+          source: test-sites/ignored
+          ignore-regex: ^/ignored-missing\.html$
+
