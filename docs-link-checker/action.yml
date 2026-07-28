@@ -87,6 +87,7 @@ runs:
         set -euo pipefail
 
         venv_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/docs-link-checker-venv-${INPUT_PYLINKVALIDATOR_VERSION}-XXXXXXXX")"
+        trap 'status=$?; if [[ $status -ne 0 ]]; then rm -rf "$venv_dir"; fi' EXIT
         if ! venv_output="$("$PROVISIONED_PYTHON" -m venv "$venv_dir" 2>&1)"; then
           echo "Virtual-environment creation failure: could not create an isolated environment at: $venv_dir" >&2
           echo "$venv_output" >&2
@@ -114,7 +115,7 @@ runs:
           exit 1
         fi
 
-        if ! import_output="$("$checker_python" - 2>&1 <<'PY'
+        if ! import_output="$("$checker_python" - <<'PY' 2>&1
         from pylinkvalidator.api import crawl
 
         print("pylinkvalidator API import OK")
