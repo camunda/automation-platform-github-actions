@@ -17,7 +17,6 @@ jobs:
     permissions:
       contents: read
       issues: read
-      id-token: write  # mint GitHub OIDC token for Vault JWT auth
     uses: ./.github/workflows/extract-issue-links.yml
     secrets: inherit
     with: 
