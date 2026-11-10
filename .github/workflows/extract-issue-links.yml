@@ -42,12 +42,26 @@ jobs:
     runs-on: ubuntu-latest
     name: Extract JIRA issues and notify on slack
     steps:
+      - name: Select Vault auth method
+        id: vault-auth
+        env:
+          VAULT_JWT_ROLE: ${{ secrets.VAULT_JWT_ROLE }}
+        run: |
+          if [ -n "$VAULT_JWT_ROLE" ] && [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
+            echo "method=jwt" >> "$GITHUB_OUTPUT"
+          else
+            echo "method=approle" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Vault AppRole is deprecated::Grant 'id-token: write' to the calling job and pass VAULT_JWT_ROLE, VAULT_JWT_PATH and VAULT_JWT_AUDIENCE. AppRole support will be removed from this workflow, see https://github.com/camunda/team-infrastructure/issues/1076"
+          fi
       - name: Import Secrets
         id: secrets
-        uses: hashicorp/vault-action@v2.4.3
+        uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc  # v4.0.0
         with:
           url: ${{ secrets.VAULT_ADDR }}
-          method: approle
+          method: ${{ steps.vault-auth.outputs.method }}
+          role: ${{ steps.vault-auth.outputs.method == 'jwt' && secrets.VAULT_JWT_ROLE || '' }}
+          path: ${{ steps.vault-auth.outputs.method == 'jwt' && secrets.VAULT_JWT_PATH || '' }}
+          jwtGithubAudience: ${{ steps.vault-auth.outputs.method == 'jwt' && secrets.VAULT_JWT_AUDIENCE || '' }}
           roleId: ${{ secrets.VAULT_ROLE_ID }}
           secretId: ${{ secrets.VAULT_SECRET_ID }}
           secrets: |
