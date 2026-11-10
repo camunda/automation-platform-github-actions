@@ -36,6 +36,21 @@ on:
         required: false
         type: boolean
         default: false
+    secrets:
+      VAULT_ADDR:
+        required: false
+      VAULT_JWT_ROLE:
+        required: false
+      VAULT_JWT_PATH:
+        required: false
+      VAULT_JWT_AUDIENCE:
+        required: false
+      VAULT_ROLE_ID:
+        description: 'Deprecated: use VAULT_JWT_ROLE, VAULT_JWT_PATH and VAULT_JWT_AUDIENCE'
+        required: false
+      VAULT_SECRET_ID:
+        description: 'Deprecated: use VAULT_JWT_ROLE, VAULT_JWT_PATH and VAULT_JWT_AUDIENCE'
+        required: false
 
 jobs:
   extract-issue-links:
